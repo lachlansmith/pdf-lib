@@ -4,9 +4,10 @@ import {
   drawLine,
   drawLinesOfText,
   drawPage,
-  drawRectangle,
-  drawSvgPath,
+  drawRect,
+  drawPath,
   drawEllipse,
+  draw,
 } from 'src/api/operations';
 import {
   popGraphicsState,
@@ -19,18 +20,19 @@ import PDFDocument from 'src/api/PDFDocument';
 import PDFEmbeddedPage from 'src/api/PDFEmbeddedPage';
 import PDFFont from 'src/api/PDFFont';
 import PDFImage from 'src/api/PDFImage';
+import PDFGraphic from 'src/api/PDFGraphic';
 import {
   PDFPageDrawCircleOptions,
   PDFPageDrawEllipseOptions,
   PDFPageDrawImageOptions,
   PDFPageDrawLineOptions,
   PDFPageDrawPageOptions,
-  PDFPageDrawRectangleOptions,
-  PDFPageDrawSquareOptions,
-  PDFPageDrawSVGOptions,
+  PDFPageDrawRectOptions,
+  PDFPageDrawPathOptions,
   PDFPageDrawTextOptions,
+  PDFPageDrawOptions,
+  //   PDFPageDrawGraphicOptions,
   BlendMode,
-  PDFPageDrawSVGElementOptions,
 } from 'src/api/PDFPageOptions';
 import { degrees, Rotation, toDegrees } from 'src/api/rotations';
 import { StandardFonts } from 'src/api/StandardFonts';
@@ -56,7 +58,6 @@ import {
   assertRangeOrUndefined,
   assertIsOneOfOrUndefined,
 } from 'src/utils';
-import { drawSvg } from './svg';
 
 /**
  * Represents a single page of a [[PDFDocument]].
@@ -1178,13 +1179,14 @@ export default class PDFPage {
    * ```js
    * import { rgb } from 'pdf-lib'
    *
-   * const svgPath = 'M 0,20 L 100,160 Q 130,200 150,120 C 190,-40 200,200 300,150 L 400,90'
+   * const d = 'M 0,20 L 100,160 Q 130,200 150,120 C 190,-40 200,200 300,150 L 400,90'
    *
    * // Draw path as black line
-   * page.drawSvgPath(svgPath, { x: 25, y: 75 })
+   * page.drawPath({ d: d, x: 25, y: 75 })
    *
    * // Change border style and opacity
-   * page.drawSvgPath(svgPath, {
+   * page.drawPath({
+   *   d: d,
    *   x: 25,
    *   y: 275,
    *   borderColor: rgb(0.5, 0.5, 0.5),
@@ -1193,7 +1195,8 @@ export default class PDFPage {
    * })
    *
    * // Set fill color and opacity
-   * page.drawSvgPath(svgPath, {
+   * page.drawPath({
+   *   d: d,
    *   x: 25,
    *   y: 475,
    *   color: rgb(1.0, 0, 0),
@@ -1201,7 +1204,8 @@ export default class PDFPage {
    * })
    *
    * // Draw 50% of original size
-   * page.drawSvgPath(svgPath, {
+   * page.drawPath({
+   *   d: d,
    *   x: 25,
    *   y: 675,
    *   scale: 0.5,
@@ -1210,29 +1214,25 @@ export default class PDFPage {
    * @param path The SVG path to be drawn.
    * @param options The options to be used when drawing the SVG path.
    */
-  drawSvgPath(path: string, options: PDFPageDrawSVGOptions = {}): void {
-    assertIs(path, 'path', ['string']);
-    assertOrUndefined(options.x, 'options.x', ['number']);
-    assertOrUndefined(options.y, 'options.y', ['number']);
+  drawPath(options: PDFPageDrawPathOptions = {}): void {
+    assertOrUndefined(options.d, 'options.d', ['string']);
     assertOrUndefined(options.scale, 'options.scale', ['number']);
     assertOrUndefined(options.rotate, 'options.rotate', [[Object, 'Rotation']]);
-    assertOrUndefined(options.borderWidth, 'options.borderWidth', ['number']);
-    assertOrUndefined(options.color, 'options.color', [[Object, 'Color']]);
-    assertRangeOrUndefined(options.opacity, 'opacity.opacity', 0, 1);
-    assertOrUndefined(options.borderColor, 'options.borderColor', [
-      [Object, 'Color'],
-    ]);
-    assertOrUndefined(options.borderDashArray, 'options.borderDashArray', [
+    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
+    assertOrUndefined(options.fill, 'options.fill', [[Object, 'Color']]);
+    assertOrUndefined(options.stroke, 'options.stroke', [[Object, 'Color']]);
+    assertOrUndefined(options.strokeDashArray, 'options.strokeDashArray', [
       Array,
     ]);
-    assertOrUndefined(options.borderDashPhase, 'options.borderDashPhase', [
+    assertOrUndefined(options.strokeDashPhase, 'options.strokeDashPhase', [
       'number',
     ]);
     assertIsOneOfOrUndefined(
-      options.borderLineCap,
+      options.strokeLineCap,
       'options.borderLineCap',
       LineCapStyle,
     );
+    assertRangeOrUndefined(options.opacity, 'opacity.opacity', 0, 1);
     assertRangeOrUndefined(
       options.borderOpacity,
       'options.borderOpacity',
@@ -1248,22 +1248,21 @@ export default class PDFPage {
     });
 
     if (!('color' in options) && !('borderColor' in options)) {
-      options.borderColor = rgb(0, 0, 0);
+      options.stroke = rgb(0, 0, 0);
     }
 
     const contentStream = this.getContentStream();
     contentStream.push(
-      ...drawSvgPath(path, {
-        x: options.x ?? this.x,
-        y: options.y ?? this.y,
+      ...drawPath({
+        d: options.d ?? '',
         scale: options.scale,
         rotate: options.rotate ?? degrees(0),
-        color: options.color ?? undefined,
-        borderColor: options.borderColor ?? undefined,
-        borderWidth: options.borderWidth ?? 0,
-        borderDashArray: options.borderDashArray ?? undefined,
-        borderDashPhase: options.borderDashPhase ?? undefined,
-        borderLineCap: options.borderLineCap ?? undefined,
+        fill: options.fill ?? undefined,
+        stroke: options.stroke ?? undefined,
+        strokeWidth: options.strokeWidth ?? 0,
+        strokeDashArray: options.strokeDashArray ?? undefined,
+        strokeDashPhase: options.strokeDashPhase ?? undefined,
+        strokeLineCap: options.strokeLineCap ?? undefined,
         graphicsState: graphicsStateKey,
       }),
     );
@@ -1285,21 +1284,23 @@ export default class PDFPage {
    * @param options The options to be used when drawing the line.
    */
   drawLine(options: PDFPageDrawLineOptions): void {
-    assertIs(options.start, 'options.start', [
-      [Object, '{ x: number, y: number }'],
+    assertIs(options.x1, 'options.x1', ['number']);
+    assertIs(options.y1, 'options.x1', ['number']);
+    assertIs(options.x2, 'options.x1', ['number']);
+    assertIs(options.y2, 'options.x1', ['number']);
+    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
+    assertOrUndefined(options.stroke, 'options.stroke', [[Object, 'Color']]);
+    assertOrUndefined(options.strokeDashArray, 'options.strokeDashArray', [
+      Array,
     ]);
-    assertIs(options.end, 'options.end', [
-      [Object, '{ x: number, y: number }'],
+    assertOrUndefined(options.strokeDashPhase, 'options.strokeDashPhase', [
+      'number',
     ]);
-    assertIs(options.start.x, 'options.start.x', ['number']);
-    assertIs(options.start.y, 'options.start.y', ['number']);
-    assertIs(options.end.x, 'options.end.x', ['number']);
-    assertIs(options.end.y, 'options.end.y', ['number']);
-    assertOrUndefined(options.thickness, 'options.thickness', ['number']);
-    assertOrUndefined(options.color, 'options.color', [[Object, 'Color']]);
-    assertOrUndefined(options.dashArray, 'options.dashArray', [Array]);
-    assertOrUndefined(options.dashPhase, 'options.dashPhase', ['number']);
-    assertIsOneOfOrUndefined(options.lineCap, 'options.lineCap', LineCapStyle);
+    assertIsOneOfOrUndefined(
+      options.strokeLineCap,
+      'options.strokeLineCap',
+      LineCapStyle,
+    );
     assertRangeOrUndefined(options.opacity, 'opacity.opacity', 0, 1);
     assertIsOneOfOrUndefined(options.blendMode, 'options.blendMode', BlendMode);
 
@@ -1308,20 +1309,22 @@ export default class PDFPage {
       blendMode: options.blendMode,
     });
 
-    if (!('color' in options)) {
-      options.color = rgb(0, 0, 0);
+    if (!('stroke' in options)) {
+      options.stroke = rgb(0, 0, 0);
     }
 
     const contentStream = this.getContentStream();
     contentStream.push(
       ...drawLine({
-        start: options.start,
-        end: options.end,
-        thickness: options.thickness ?? 1,
-        color: options.color ?? undefined,
-        dashArray: options.dashArray ?? undefined,
-        dashPhase: options.dashPhase ?? undefined,
-        lineCap: options.lineCap ?? undefined,
+        x1: options.x1 ?? 0,
+        y1: options.y1 ?? 0,
+        x2: options.x2 ?? 1,
+        y2: options.y2 ?? 1,
+        stroke: options.stroke ?? undefined,
+        strokeWidth: options.strokeWidth ?? 1,
+        strokeDashArray: options.strokeDashArray ?? undefined,
+        strokeDashPhase: options.strokeDashPhase ?? undefined,
+        strokeLineCap: options.strokeLineCap ?? undefined,
         graphicsState: graphicsStateKey,
       }),
     );
@@ -1347,28 +1350,26 @@ export default class PDFPage {
    * ```
    * @param options The options to be used when drawing the rectangle.
    */
-  drawRectangle(options: PDFPageDrawRectangleOptions = {}): void {
+  drawRect(options: PDFPageDrawRectOptions = {}): void {
     assertOrUndefined(options.x, 'options.x', ['number']);
     assertOrUndefined(options.y, 'options.y', ['number']);
     assertOrUndefined(options.width, 'options.width', ['number']);
     assertOrUndefined(options.height, 'options.height', ['number']);
+    assertOrUndefined(options.rx, 'options.rx', ['number']);
+    assertOrUndefined(options.ry, 'options.ry', ['number']);
     assertOrUndefined(options.rotate, 'options.rotate', [[Object, 'Rotation']]);
-    assertOrUndefined(options.xSkew, 'options.xSkew', [[Object, 'Rotation']]);
-    assertOrUndefined(options.ySkew, 'options.ySkew', [[Object, 'Rotation']]);
-    assertOrUndefined(options.borderWidth, 'options.borderWidth', ['number']);
-    assertOrUndefined(options.color, 'options.color', [[Object, 'Color']]);
+    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
+    assertOrUndefined(options.fill, 'options.color', [[Object, 'Color']]);
     assertRangeOrUndefined(options.opacity, 'opacity.opacity', 0, 1);
-    assertOrUndefined(options.borderColor, 'options.borderColor', [
-      [Object, 'Color'],
-    ]);
-    assertOrUndefined(options.borderDashArray, 'options.borderDashArray', [
+    assertOrUndefined(options.stroke, 'options.stroke', [[Object, 'Color']]);
+    assertOrUndefined(options.strokeDashArray, 'options.strokeDashArray', [
       Array,
     ]);
-    assertOrUndefined(options.borderDashPhase, 'options.borderDashPhase', [
+    assertOrUndefined(options.strokeDashPhase, 'options.strokeDashPhase', [
       'number',
     ]);
     assertIsOneOfOrUndefined(
-      options.borderLineCap,
+      options.strokeLineCap,
       'options.borderLineCap',
       LineCapStyle,
     );
@@ -1386,54 +1387,29 @@ export default class PDFPage {
       blendMode: options.blendMode,
     });
 
-    if (!('color' in options) && !('borderColor' in options)) {
-      options.color = rgb(0, 0, 0);
+    if (!('fill' in options) && !('stroke' in options)) {
+      options.fill = rgb(0, 0, 0);
     }
 
     const contentStream = this.getContentStream();
     contentStream.push(
-      ...drawRectangle({
+      ...drawRect({
         x: options.x ?? this.x,
         y: options.y ?? this.y,
         width: options.width ?? 150,
         height: options.height ?? 100,
-        rotate: options.rotate ?? degrees(0),
-        xSkew: options.xSkew ?? degrees(0),
-        ySkew: options.ySkew ?? degrees(0),
-        borderWidth: options.borderWidth ?? 0,
-        color: options.color ?? undefined,
-        borderColor: options.borderColor ?? undefined,
-        borderDashArray: options.borderDashArray ?? undefined,
-        borderDashPhase: options.borderDashPhase ?? undefined,
+        rx: options.rx ?? undefined,
+        ry: options.ry ?? undefined,
+        fill: options.fill ?? undefined,
+        fillRule: options.fillRule ?? 'nonzero',
+        stroke: options.stroke ?? undefined,
+        strokeWidth: options.strokeWidth ?? 0,
+        strokeDashArray: options.strokeDashArray ?? undefined,
+        strokeDashPhase: options.strokeDashPhase ?? undefined,
         graphicsState: graphicsStateKey,
-        borderLineCap: options.borderLineCap ?? undefined,
+        strokeLineCap: options.strokeLineCap ?? undefined,
       }),
     );
-  }
-
-  /**
-   * Draw a square on this page. For example:
-   * ```js
-   * import { degrees, grayscale, rgb } from 'pdf-lib'
-   *
-   * page.drawSquare({
-   *   x: 25,
-   *   y: 75,
-   *   size: 100,
-   *   rotate: degrees(-15),
-   *   borderWidth: 5,
-   *   borderColor: grayscale(0.5),
-   *   color: rgb(0.75, 0.2, 0.2),
-   *   opacity: 0.5,
-   *   borderOpacity: 0.75,
-   * })
-   * ```
-   * @param options The options to be used when drawing the square.
-   */
-  drawSquare(options: PDFPageDrawSquareOptions = {}): void {
-    const { size } = options;
-    assertOrUndefined(size, 'size', ['number']);
-    this.drawRectangle({ ...options, width: size, height: size });
   }
 
   /**
@@ -1456,32 +1432,31 @@ export default class PDFPage {
    * @param options The options to be used when drawing the ellipse.
    */
   drawEllipse(options: PDFPageDrawEllipseOptions = {}): void {
-    assertOrUndefined(options.x, 'options.x', ['number']);
-    assertOrUndefined(options.y, 'options.y', ['number']);
-    assertOrUndefined(options.xScale, 'options.xScale', ['number']);
-    assertOrUndefined(options.yScale, 'options.yScale', ['number']);
+    assertOrUndefined(options.cx, 'options.x', ['number']);
+    assertOrUndefined(options.cy, 'options.y', ['number']);
+    assertOrUndefined(options.rx, 'options.xScale', ['number']);
+    assertOrUndefined(options.ry, 'options.yScale', ['number']);
     assertOrUndefined(options.rotate, 'options.rotate', [[Object, 'Rotation']]);
-    assertOrUndefined(options.color, 'options.color', [[Object, 'Color']]);
+    assertOrUndefined(options.fill, 'options.fill', ['number']);
+    assertOrUndefined(options.fillRule, 'options.fillRule', ['number']);
     assertRangeOrUndefined(options.opacity, 'opacity.opacity', 0, 1);
-    assertOrUndefined(options.borderColor, 'options.borderColor', [
-      [Object, 'Color'],
-    ]);
+    assertOrUndefined(options.stroke, 'options.stroke', [[Object, 'Color']]);
     assertRangeOrUndefined(
       options.borderOpacity,
       'options.borderOpacity',
       0,
       1,
     );
-    assertOrUndefined(options.borderWidth, 'options.borderWidth', ['number']);
-    assertOrUndefined(options.borderDashArray, 'options.borderDashArray', [
+    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
+    assertOrUndefined(options.strokeDashArray, 'options.strokeDashArray', [
       Array,
     ]);
-    assertOrUndefined(options.borderDashPhase, 'options.borderDashPhase', [
+    assertOrUndefined(options.strokeDashPhase, 'options.strokeDashPhase', [
       'number',
     ]);
     assertIsOneOfOrUndefined(
-      options.borderLineCap,
-      'options.borderLineCap',
+      options.strokeLineCap,
+      'options.strokeLineCap',
       LineCapStyle,
     );
     assertIsOneOfOrUndefined(options.blendMode, 'options.blendMode', BlendMode);
@@ -1491,24 +1466,25 @@ export default class PDFPage {
       blendMode: options.blendMode,
     });
 
-    if (!('color' in options) && !('borderColor' in options)) {
-      options.color = rgb(0, 0, 0);
+    if (!('fill' in options) && !('stroke' in options)) {
+      options.fill = rgb(0, 0, 0);
     }
 
     const contentStream = this.getContentStream();
     contentStream.push(
       ...drawEllipse({
-        x: options.x ?? this.x,
-        y: options.y ?? this.y,
-        xScale: options.xScale ?? 100,
-        yScale: options.yScale ?? 100,
+        cx: options.cx ?? this.x,
+        cy: options.cy ?? this.y,
+        rx: options.rx ?? 100,
+        ry: options.ry ?? 100,
         rotate: options.rotate ?? undefined,
-        color: options.color ?? undefined,
-        borderColor: options.borderColor ?? undefined,
-        borderWidth: options.borderWidth ?? 0,
-        borderDashArray: options.borderDashArray ?? undefined,
-        borderDashPhase: options.borderDashPhase ?? undefined,
-        borderLineCap: options.borderLineCap ?? undefined,
+        fill: options.fill ?? undefined,
+        fillRule: options.fillRule ?? 'nonzero',
+        stroke: options.stroke ?? undefined,
+        strokeWidth: options.strokeWidth ?? 0,
+        strokeDashArray: options.strokeDashArray ?? undefined,
+        strokeDashPhase: options.strokeDashPhase ?? undefined,
+        strokeLineCap: options.strokeLineCap ?? undefined,
         graphicsState: graphicsStateKey,
       }),
     );
@@ -1533,9 +1509,9 @@ export default class PDFPage {
    * @param options The options to be used when drawing the ellipse.
    */
   drawCircle(options: PDFPageDrawCircleOptions = {}): void {
-    const { size = 100 } = options;
-    assertOrUndefined(size, 'size', ['number']);
-    this.drawEllipse({ ...options, xScale: size, yScale: size });
+    const { r = 100 } = options;
+    assertOrUndefined(r, 'size', ['number']);
+    this.drawEllipse({ ...options, rx: r, ry: r });
   }
 
   private setOrEmbedFont(font?: PDFFont) {
@@ -1562,20 +1538,22 @@ export default class PDFPage {
    * @param svg The SVG to be drawn.
    * @param options The options to be used when drawing the SVG.
    */
-  drawSvg(svg: string, options: PDFPageDrawSVGElementOptions = {}): void {
-    assertIs(svg, 'svg', ['string']);
+  draw(graphic: PDFGraphic, options: PDFPageDrawOptions = {}): void {
+    assertIs(graphic, 'graphic', [[Object, 'PDFGraphic']]);
     assertOrUndefined(options.x, 'options.x', ['number']);
     assertOrUndefined(options.y, 'options.y', ['number']);
-    assertOrUndefined(options.width, 'options.width', ['number']);
-    assertOrUndefined(options.height, 'options.height', ['number']);
+    assertOrUndefined(options.rotate, 'options.rotate', [[Object, 'Rotation']]);
+    assertOrUndefined(options.scale, 'options.scale', ['number']);
 
-    drawSvg(this, svg, {
-      x: options.x ?? this.x,
-      y: options.y ?? this.y,
-      fonts: options.fonts,
-      width: options.width,
-      height: options.height,
-    });
+    const contentStream = this.getContentStream();
+    contentStream.push(
+      ...draw(graphic, this, {
+        x: options.x || 0,
+        y: options.y || 0,
+        rotate: options.rotate || degrees(0),
+        scale: options.scale || 1,
+      }),
+    );
   }
 
   getFont(): [PDFFont, PDFName] {

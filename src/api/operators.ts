@@ -10,8 +10,13 @@ import {
 
 /* ==================== Clipping Path Operators ==================== */
 
-export const clip = () => PDFOperator.of(Ops.ClipNonZero);
-export const clipEvenOdd = () => PDFOperator.of(Ops.ClipEvenOdd);
+export const clip = (rule?: 'nonzero' | 'evenodd') => {
+  if (rule === 'evenodd') {
+    return PDFOperator.of(Ops.ClipEvenOdd);
+  }
+
+  return PDFOperator.of(Ops.ClipNonZero);
+};
 
 /* ==================== Graphics State Operators ==================== */
 
@@ -34,11 +39,50 @@ export const concatTransformationMatrix = (
     asPDFNumber(f),
   ]);
 
-export const translate = (xPos: number | PDFNumber, yPos: number | PDFNumber) =>
-  concatTransformationMatrix(1, 0, 0, 1, xPos, yPos);
+export const matrix = (
+  a: number | PDFNumber,
+  b: number | PDFNumber,
+  c: number | PDFNumber,
+  d: number | PDFNumber,
+  e: number | PDFNumber,
+  f: number | PDFNumber,
+) => concatTransformationMatrix(a, b, c, d, e, f);
 
-export const scale = (xPos: number | PDFNumber, yPos: number | PDFNumber) =>
-  concatTransformationMatrix(xPos, 0, 0, yPos, 0, 0);
+export const translate = (tx: number | PDFNumber, ty: number | PDFNumber) =>
+  concatTransformationMatrix(1, 0, 0, 1, tx, ty);
+
+export const translateX = (tx: number | PDFNumber) =>
+  concatTransformationMatrix(1, 0, 0, 1, tx, 0);
+
+export const translateY = (ty: number | PDFNumber) =>
+  concatTransformationMatrix(1, 0, 0, 1, 0, ty);
+
+export const rotate = (angle: number | PDFNumber) => rotateDegrees(angle);
+
+export const scale = (sx: number | PDFNumber, sy: number | PDFNumber) =>
+  concatTransformationMatrix(sx, 0, 0, sy, 0, 0);
+
+export const scaleX = (xPos: number | PDFNumber) =>
+  concatTransformationMatrix(xPos, 0, 0, 0, 0, 0);
+
+export const scaleY = (yPos: number | PDFNumber) =>
+  concatTransformationMatrix(0, 0, 0, yPos, 0, 0);
+
+export const skew = (skx: number | PDFNumber, sky: number | PDFNumber) =>
+  concatTransformationMatrix(
+    1,
+    tan(asNumber(skx)),
+    tan(asNumber(sky)),
+    1,
+    0,
+    0,
+  );
+
+export const skewX = (skx: number | PDFNumber) =>
+  concatTransformationMatrix(1, tan(asNumber(skx)), 0, 1, 0, 0);
+
+export const skewY = (sky: number | PDFNumber) =>
+  concatTransformationMatrix(1, 0, tan(asNumber(sky)), 1, 0, 0);
 
 export const rotateRadians = (angle: number | PDFNumber) =>
   concatTransformationMatrix(
@@ -185,9 +229,21 @@ export const square = (xPos: number, yPos: number, size: number) =>
 
 export const stroke = () => PDFOperator.of(Ops.StrokePath);
 
-export const fill = () => PDFOperator.of(Ops.FillNonZero);
+export const fill = (rule?: 'nonzero' | 'evenodd') => {
+  if (rule === 'evenodd') {
+    return PDFOperator.of(Ops.FillEvenOdd);
+  }
 
-export const fillAndStroke = () => PDFOperator.of(Ops.FillNonZeroAndStroke);
+  return PDFOperator.of(Ops.FillNonZero);
+};
+
+export const fillAndStroke = (rule?: 'nonzero' | 'evenodd') => {
+  if (rule === 'evenodd') {
+    return PDFOperator.of(Ops.FillEvenOddAndStroke);
+  }
+
+  return PDFOperator.of(Ops.FillNonZeroAndStroke);
+};
 
 export const endPath = () => PDFOperator.of(Ops.EndPath);
 

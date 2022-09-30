@@ -60,108 +60,101 @@ export interface PDFPageDrawPageOptions {
   blendMode?: BlendMode;
 }
 
-export interface PDFPageDrawSVGOptions {
-  x?: number;
-  y?: number;
-  scale?: number;
+export interface PDFPageDrawPathOptions {
+  d?: string;
   rotate?: Rotation;
-  borderWidth?: number;
-  color?: Color;
-  opacity?: number;
-  borderColor?: Color;
+  scale?: number;
+  fill?: Color;
+  fillRule?: 'nonzero' | 'evenodd';
+  stroke?: Color;
+  strokeWidth?: number;
+  strokeDashArray?: number[];
+  strokeDashPhase?: number;
+  strokeLineCap?: LineCapStyle;
   borderOpacity?: number;
-  borderDashArray?: number[];
-  borderDashPhase?: number;
-  borderLineCap?: LineCapStyle;
+  opacity?: number;
   blendMode?: BlendMode;
 }
 
 export interface PDFPageDrawLineOptions {
-  start: { x: number; y: number };
-  end: { x: number; y: number };
-  thickness?: number;
-  color?: Color;
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
+  rotate?: Rotation;
+  scale?: number;
+  stroke?: Color;
+  strokeWidth?: number;
+  strokeLineCap?: LineCapStyle;
+  strokeDashArray?: number[];
+  strokeDashPhase?: number;
   opacity?: number;
-  lineCap?: LineCapStyle;
-  dashArray?: number[];
-  dashPhase?: number;
   blendMode?: BlendMode;
 }
 
-export interface PDFPageDrawRectangleOptions {
+export interface PDFPageDrawRectOptions {
   x?: number;
   y?: number;
   width?: number;
   height?: number;
+  rx?: number;
+  ry?: number;
   rotate?: Rotation;
-  xSkew?: Rotation;
-  ySkew?: Rotation;
-  borderWidth?: number;
-  color?: Color;
-  opacity?: number;
-  borderColor?: Color;
+  scale?: number;
+  fill?: Color;
+  fillRule?: 'nonzero' | 'evenodd';
+  stroke?: Color;
+  strokeWidth?: number;
+  strokeDashArray?: number[];
+  strokeDashPhase?: number;
+  strokeLineCap?: LineCapStyle;
   borderOpacity?: number;
-  borderDashArray?: number[];
-  borderDashPhase?: number;
-  borderLineCap?: LineCapStyle;
-  blendMode?: BlendMode;
-}
-
-export interface PDFPageDrawSquareOptions {
-  x?: number;
-  y?: number;
-  size?: number;
-  rotate?: Rotation;
-  xSkew?: Rotation;
-  ySkew?: Rotation;
-  borderWidth?: number;
-  color?: Color;
   opacity?: number;
-  borderColor?: Color;
-  borderOpacity?: number;
-  borderDashArray?: number[];
-  borderDashPhase?: number;
-  borderLineCap?: LineCapStyle;
   blendMode?: BlendMode;
 }
 
 export interface PDFPageDrawEllipseOptions {
-  x?: number;
-  y?: number;
-  xScale?: number;
-  yScale?: number;
+  cx?: number;
+  cy?: number;
+  rx?: number;
+  ry?: number;
   rotate?: Rotation;
-  color?: Color;
-  opacity?: number;
-  borderColor?: Color;
+  scale?: number;
+  fill?: Color;
+  fillRule?: 'nonzero' | 'evenodd';
+  stroke?: Color;
+  strokeWidth?: number;
+  strokeDashArray?: number[];
+  strokeDashPhase?: number;
+  strokeLineCap?: LineCapStyle;
   borderOpacity?: number;
-  borderWidth?: number;
-  borderDashArray?: number[];
-  borderDashPhase?: number;
-  borderLineCap?: LineCapStyle;
+  opacity?: number;
   blendMode?: BlendMode;
 }
 
 export interface PDFPageDrawCircleOptions {
-  x?: number;
-  y?: number;
-  size?: number;
-  color?: Color;
-  opacity?: number;
-  borderColor?: Color;
+  cx?: number;
+  cy?: number;
+  r?: number;
+  rotate?: Rotation;
+  scale?: number;
+  fill?: Color;
+  fillRule?: 'nonzero' | 'evenodd';
+  stroke?: Color;
+  strokeWidth?: number;
+  strokeDashArray?: number[];
+  strokeDashPhase?: number;
+  strokeLineCap?: LineCapStyle;
   borderOpacity?: number;
-  borderWidth?: number;
-  borderDashArray?: number[];
-  borderDashPhase?: number;
-  borderLineCap?: LineCapStyle;
+  opacity?: number;
   blendMode?: BlendMode;
 }
 
-export interface PDFPageDrawSVGElementOptions {
+export interface PDFPageDrawOptions {
   x?: number;
   y?: number;
-  width?: number;
-  height?: number;
-  fontSize?: number;
-  fonts?: { [fontName: string]: PDFFont };
+  rotate?: Rotation;
+  scale?: number;
 }
+
+export interface PDFPageDrawGraphicOptions {}

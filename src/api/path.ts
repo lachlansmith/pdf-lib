@@ -364,7 +364,7 @@ const runners: CmdToOperatorsMap = {
   },
 };
 
-const solveArc = (x: number, y: number, coords: number[]) => {
+export const solveArc = (x: number, y: number, coords: number[]) => {
   const [rx, ry, rot, large, sweep, ex, ey] = coords;
   const segs = arcToSegments(ex, ey, rx, ry, large, sweep, rot, x, y);
 
@@ -486,4 +486,4 @@ const segmentToBezier = (
   return result;
 };
 
-export const svgPathToOperators = (path: string) => apply(parse(path));
+export const pathToOperators = (path: string) => apply(parse(path));

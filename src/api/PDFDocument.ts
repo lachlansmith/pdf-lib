@@ -10,6 +10,7 @@ import PDFFont from 'src/api/PDFFont';
 import PDFImage from 'src/api/PDFImage';
 import PDFPage from 'src/api/PDFPage';
 import PDFForm from 'src/api/form/PDFForm';
+import PDFGraphic, { JSXParsers } from 'src/api/PDFGraphic';
 import { PageSizes } from 'src/api/sizes';
 import { StandardFonts } from 'src/api/StandardFonts';
 import {
@@ -66,6 +67,8 @@ import FileEmbedder, { AFRelationship } from 'src/core/embedders/FileEmbedder';
 import PDFEmbeddedFile from 'src/api/PDFEmbeddedFile';
 import PDFJavaScript from 'src/api/PDFJavaScript';
 import JavaScriptEmbedder from 'src/core/embedders/JavaScriptEmbedder';
+// import parseHtml from 'react-html-parser';
+// import { minify as minifyHtml } from 'html-minifier';
 
 /**
  * Represents a PDF document.
@@ -1229,6 +1232,38 @@ export default class PDFDocument {
 
     return embeddedPages;
   }
+
+  async parseJsx(jsx: React.ReactElement): Promise<PDFGraphic> {
+    const parser = JSXParsers[jsx.type.toString()];
+
+    return typeof parser === 'function'
+      ? await JSXParsers[jsx.type.toString()](jsx.props, this)
+      : undefined;
+  }
+  // let jsx;
+  // if (typeof svg === 'string') {
+  //   jsx = parseHtml(
+  //     minifyHtml(svg, {
+  //       minifyCSS: true,
+  //       minifyJS: true,
+  //       minifyURLs: true,
+  //       removeComments: true,
+  //     }),
+  //   ).filter((node) => node && node.type === 'svg');
+  // } else {
+  //   jsx = [svg];
+  // }
+
+  //     return (
+  //       await Promise.all(
+  //         jsx.map(async ({ type, props }: any) =>
+  //           typeof parseJsx[type] === 'function'
+  //             ? await parseJsx[type](props, this)
+  //             : undefined,
+  //         ),
+  //       )
+  //     ).filter(Boolean) as PDFGraphic[];
+  //   }
 
   /**
    * > **NOTE:** You shouldn't need to call this method directly. The [[save]]
