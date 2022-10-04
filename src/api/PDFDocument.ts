@@ -1240,30 +1240,6 @@ export default class PDFDocument {
       ? await JSXParsers[jsx.type.toString()](jsx.props, this)
       : undefined;
   }
-  // let jsx;
-  // if (typeof svg === 'string') {
-  //   jsx = parseHtml(
-  //     minifyHtml(svg, {
-  //       minifyCSS: true,
-  //       minifyJS: true,
-  //       minifyURLs: true,
-  //       removeComments: true,
-  //     }),
-  //   ).filter((node) => node && node.type === 'svg');
-  // } else {
-  //   jsx = [svg];
-  // }
-
-  //     return (
-  //       await Promise.all(
-  //         jsx.map(async ({ type, props }: any) =>
-  //           typeof parseJsx[type] === 'function'
-  //             ? await parseJsx[type](props, this)
-  //             : undefined,
-  //         ),
-  //       )
-  //     ).filter(Boolean) as PDFGraphic[];
-  //   }
 
   /**
    * > **NOTE:** You shouldn't need to call this method directly. The [[save]]

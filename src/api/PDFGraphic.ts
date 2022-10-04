@@ -243,24 +243,9 @@ export const JSXParsers: {
   definitions: {},
 
   async svg(props: any, doc: PDFDocument) {
-    let { style, transform } = props;
-    console.log(props);
-    console.log(this);
-    const attributes = hierarchy(props, this.internalCSS, style);
+    const attr = hierarchy(props, this.internalCSS, props.style);
 
-    let {
-      clipPath,
-      clipRule,
-      fill,
-      fillRule,
-      stroke,
-      strokeWidth,
-      strokeDashArray,
-      strokeDashOffset,
-      opacity,
-      strokeOpacity,
-      mixBlendMode,
-    } = attributes;
+    let { clipPath, mixBlendMode } = attr;
 
     if (clipPath) {
       const match = /url\((.*)\)/g.exec(clipPath);
@@ -269,14 +254,10 @@ export const JSXParsers: {
       }
     }
 
-    if (stroke) {
-      stroke = parseColor(stroke);
-    }
-
-    if (fill && fill !== 'none') {
-      fill = parseColor(fill);
-    } else {
-      fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
+    if (mixBlendMode) {
+      mixBlendMode = camel(mixBlendMode);
+      mixBlendMode =
+        mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
     }
 
     let children: (PDFGraphic | undefined)[] = [];
@@ -296,51 +277,22 @@ export const JSXParsers: {
       }
     }
 
-    if (mixBlendMode) {
-      mixBlendMode = camel(mixBlendMode);
-      mixBlendMode =
-        mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
-    }
-
-    if (transform) {
-      transform = parseTransform(transform);
-    }
-
     return removeUndefined({
       type: 'group',
       clipPath: clipPath,
-      clipRule: clipRule,
-      fill: fill,
-      fillRule: fillRule,
-      stroke: stroke,
-      strokeWidth: strokeWidth,
-      strokeDashArray: strokeDashArray,
-      strokeDashOffset: strokeDashOffset,
-      opacity: opacity,
-      strokeOpacity: strokeOpacity,
+      clipRule: attr.clipRule,
+      opacity: attr.opacity,
+      strokeOpacity: attr.strokeOpacity,
       mixBlendMode: mixBlendMode,
-      transform: transform,
+      transform: parseTransform(props.transform),
       children: children.filter(Boolean) as PDFGraphic[],
     });
   },
 
   async g(props: any, doc: PDFDocument) {
-    let { style, transform } = props;
-    const attributes = hierarchy(props, this.internalCSS, style);
+    const attr = hierarchy(props, this.internalCSS, props.style);
 
-    let {
-      clipPath,
-      clipRule,
-      fill,
-      fillRule,
-      stroke,
-      strokeWidth,
-      strokeDashArray,
-      strokeDashOffset,
-      opacity,
-      strokeOpacity,
-      mixBlendMode,
-    } = attributes;
+    let { clipPath, mixBlendMode } = attr;
 
     if (clipPath) {
       const match = /url\((.*)\)/g.exec(clipPath);
@@ -349,24 +301,10 @@ export const JSXParsers: {
       }
     }
 
-    if (stroke && stroke !== 'none') {
-      stroke = parseColor(stroke);
-    }
-
-    if (fill && fill !== 'none') {
-      fill = parseColor(fill);
-    } else {
-      fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
-    }
-
     if (mixBlendMode) {
       mixBlendMode = camel(mixBlendMode);
       mixBlendMode =
         mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
-    }
-
-    if (transform) {
-      transform = parseTransform(transform);
     }
 
     let children: (PDFGraphic | undefined)[] = [];
@@ -389,17 +327,21 @@ export const JSXParsers: {
     return removeUndefined({
       type: 'group',
       clipPath: clipPath,
-      clipRule: clipRule,
-      fill: fill,
-      fillRule: fillRule,
-      stroke: stroke,
-      strokeWidth: strokeWidth,
-      strokeDashArray: strokeDashArray,
-      strokeDashOffset: strokeDashOffset,
-      opacity: opacity,
-      strokeOpacity: strokeOpacity,
+      clipRule: attr.clipRule,
+      fill:
+        attr.fill && attr.fill !== 'none' ? parseColor(attr.fill) : undefined,
+      fillRule: attr.fillRule,
+      stroke:
+        attr.stroke && attr.stroke !== 'none'
+          ? parseColor(attr.stroke)
+          : undefined,
+      strokeWidth: attr.strokeWidth,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: attr.strokeDashOffset,
+      opacity: attr.opacity,
+      strokeOpacity: attr.strokeOpacity,
       mixBlendMode: mixBlendMode,
-      transform: transform,
+      transform: parseTransform(props.transform),
       children: children.filter(Boolean) as PDFGraphic[],
     });
   },
@@ -409,22 +351,9 @@ export const JSXParsers: {
   },
 
   path(props: any, _: PDFDocument): Path {
-    let { d, style, transform } = props;
-    const attributes = hierarchy(props, this.internalCSS, style);
+    const attr = hierarchy(props, this.internalCSS, props.style);
 
-    let {
-      clipPath,
-      clipRule,
-      fill,
-      fillRule,
-      stroke,
-      strokeWidth,
-      strokeDashArray,
-      strokeDashOffset,
-      opacity,
-      strokeOpacity,
-      mixBlendMode,
-    } = attributes;
+    let { clipPath, fill, mixBlendMode } = attr;
 
     if (clipPath) {
       const match = /url\((.*)\)/g.exec(clipPath);
@@ -433,12 +362,12 @@ export const JSXParsers: {
       }
     }
 
-    if (stroke) {
-      stroke = parseColor(stroke);
-    }
-
-    if (fill && fill !== 'none') {
-      fill = parseColor(fill);
+    if (fill) {
+      if (fill !== 'none') {
+        fill = parseColor(fill);
+      } else {
+        fill = undefined;
+      }
     } else {
       fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
     }
@@ -449,43 +378,31 @@ export const JSXParsers: {
         mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
     }
 
-    if (transform) {
-      transform = parseTransform(transform);
-    }
-
     return removeUndefined({
       type: 'path',
-      d: d,
+      d: props.d,
       clipPath: clipPath,
-      clipRule: clipRule,
+      clipRule: attr.clipRule,
       fill: fill,
-      fillRule: fillRule,
-      stroke: stroke,
-      strokeWidth: strokeWidth,
-      strokeDashArray: strokeDashArray,
-      strokeDashOffset: strokeDashOffset,
-      opacity: opacity,
-      strokeOpacity: strokeOpacity,
+      fillRule: attr.fillRule,
+      stroke:
+        attr.stroke && attr.stroke !== 'none'
+          ? parseColor(attr.stroke)
+          : undefined,
+      strokeWidth: attr.strokeWidth,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: attr.strokeDashOffset,
+      opacity: attr.opacity,
+      strokeOpacity: attr.strokeOpacity,
       mixBlendMode: mixBlendMode,
-      transform: transform,
+      transform: parseTransform(props.transform),
     });
   },
 
   polyline(props: any, _: PDFDocument): Path {
-    let { points, style, transform } = props;
-    const attributes = hierarchy(props, this.internalCSS, style);
+    const attr = hierarchy(props, this.internalCSS, props.style);
 
-    let {
-      clipPath,
-      clipRule,
-      stroke,
-      strokeWidth,
-      strokeDashArray,
-      strokeDashOffset,
-      opacity,
-      strokeOpacity,
-      mixBlendMode,
-    } = attributes;
+    let { clipPath, mixBlendMode } = attr;
 
     if (clipPath) {
       const match = /url\((.*)\)/g.exec(clipPath);
@@ -494,53 +411,35 @@ export const JSXParsers: {
       }
     }
 
-    if (stroke) {
-      stroke = parseColor(stroke);
-    }
-
     if (mixBlendMode) {
       mixBlendMode = camel(mixBlendMode);
       mixBlendMode =
         mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
     }
 
-    if (transform) {
-      transform = parseTransform(transform);
-    }
-
     return removeUndefined({
       type: 'path',
-      d: 'M' + points,
+      d: 'M' + props.points,
       clipPath: clipPath,
-      clipRule: clipRule,
-      stroke: stroke,
-      strokeWidth: strokeWidth,
-      strokeDashArray: strokeDashArray,
-      strokeDashOffset: strokeDashOffset,
-      opacity: opacity,
-      strokeOpacity: strokeOpacity,
+      clipRule: attr.clipRule,
+      stroke:
+        attr.stroke && attr.stroke !== 'none'
+          ? parseColor(attr.stroke)
+          : undefined,
+      strokeWidth: attr.strokeWidth,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: attr.strokeDashOffset,
+      opacity: attr.opacity,
+      strokeOpacity: attr.strokeOpacity,
       mixBlendMode: mixBlendMode,
-      transform: transform,
+      transform: parseTransform(props.transform),
     });
   },
 
   polygon(props: any, _: PDFDocument): Path {
-    let { points, style, transform } = props;
-    const attributes = hierarchy(props, this.internalCSS, style);
+    const attr = hierarchy(props, this.internalCSS, props.style);
 
-    let {
-      clipPath,
-      clipRule,
-      fill,
-      fillRule,
-      stroke,
-      strokeWidth,
-      strokeDashArray,
-      strokeDashOffset,
-      opacity,
-      strokeOpacity,
-      mixBlendMode,
-    } = attributes;
+    let { clipPath, fill, mixBlendMode } = attr;
 
     if (clipPath) {
       const match = /url\((.*)\)/g.exec(clipPath);
@@ -549,12 +448,12 @@ export const JSXParsers: {
       }
     }
 
-    if (stroke) {
-      stroke = parseColor(stroke);
-    }
-
-    if (fill && fill !== 'none') {
-      fill = parseColor(fill);
+    if (fill) {
+      if (fill !== 'none') {
+        fill = parseColor(fill);
+      } else {
+        fill = undefined;
+      }
     } else {
       fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
     }
@@ -563,47 +462,32 @@ export const JSXParsers: {
       mixBlendMode = camel(mixBlendMode);
       mixBlendMode =
         mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
-    }
-
-    if (transform) {
-      transform = parseTransform(transform);
     }
 
     return removeUndefined({
       type: 'path',
-      d: 'M' + points + 'z',
+      d: 'M' + props.points + 'z',
       clipPath: clipPath,
-      clipRule: clipRule,
+      clipRule: attr.clipRule,
       fill: fill,
-      fillRule: fillRule,
-      stroke: stroke,
-      strokeWidth: strokeWidth,
-      strokeDashArray: strokeDashArray,
-      strokeDashOffset: strokeDashOffset,
-      opacity: opacity,
-      strokeOpacity: strokeOpacity,
+      fillRule: attr.fillRule,
+      stroke:
+        attr.stroke && attr.stroke !== 'none'
+          ? parseColor(attr.stroke)
+          : undefined,
+      strokeWidth: attr.strokeWidth,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: attr.strokeDashOffset,
+      opacity: attr.opacity,
+      strokeOpacity: attr.strokeOpacity,
       mixBlendMode: mixBlendMode,
-      transform: transform,
+      transform: parseTransform(props.transform),
     });
   },
 
   circle(props: any, _: PDFDocument): Ellipse {
-    let { cx, cy, r, style, transform } = props;
-
-    const attributes = hierarchy(props, this.internalCSS, style);
-    let {
-      clipPath,
-      clipRule,
-      fill,
-      fillRule,
-      stroke,
-      strokeWidth,
-      strokeDashArray,
-      strokeDashOffset,
-      opacity,
-      strokeOpacity,
-      mixBlendMode,
-    } = attributes;
+    const attr = hierarchy(props, this.internalCSS, props.style);
+    let { clipPath, fill, mixBlendMode } = attr;
 
     if (clipPath) {
       const match = /url\((.*)\)/g.exec(clipPath);
@@ -612,12 +496,12 @@ export const JSXParsers: {
       }
     }
 
-    if (stroke) {
-      stroke = parseColor(stroke);
-    }
-
-    if (fill && fill !== 'none') {
-      fill = parseColor(fill);
+    if (fill) {
+      if (fill !== 'none') {
+        fill = parseColor(fill);
+      } else {
+        fill = undefined;
+      }
     } else {
       fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
     }
@@ -628,48 +512,34 @@ export const JSXParsers: {
         mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
     }
 
-    if (transform) {
-      transform = parseTransform(transform);
-    }
-
     return removeUndefined({
       type: 'ellipse',
-      cx: parseFloat(cx),
-      cy: parseFloat(cy),
-      rx: parseFloat(r),
-      ry: parseFloat(r),
+      cx: parseFloat(props.cx),
+      cy: parseFloat(props.cy),
+      rx: parseFloat(props.r),
+      ry: parseFloat(props.r),
       clipPath: clipPath,
-      clipRule: clipRule,
+      clipRule: attr.clipRule,
       fill: fill,
-      fillRule: fillRule,
-      stroke: stroke,
-      strokeWidth: strokeWidth,
-      strokeDashArray: strokeDashArray,
-      strokeDashOffset: strokeDashOffset,
-      opacity: opacity,
-      strokeOpacity: strokeOpacity,
+      fillRule: attr.fillRule,
+      stroke:
+        attr.stroke && attr.stroke !== 'none'
+          ? parseColor(attr.stroke)
+          : undefined,
+      strokeWidth: attr.strokeWidth,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: attr.strokeDashOffset,
+      opacity: attr.opacity,
+      strokeOpacity: attr.strokeOpacity,
       mixBlendMode: mixBlendMode,
-      transform: transform,
+      transform: parseTransform(props.transform),
     });
   },
 
   ellipse(props: any, _: PDFDocument): Ellipse {
-    let { cx, cy, rx, ry, style, transform } = props;
-    const attributes = hierarchy(props, this.internalCSS, style);
+    const attr = hierarchy(props, this.internalCSS, props.style);
 
-    let {
-      clipPath,
-      clipRule,
-      fill,
-      fillRule,
-      stroke,
-      strokeWidth,
-      strokeDashArray,
-      strokeDashOffset,
-      opacity,
-      strokeOpacity,
-      mixBlendMode,
-    } = attributes;
+    let { clipPath, fill, mixBlendMode } = attr;
 
     if (clipPath) {
       const match = /url\((.*)\)/g.exec(clipPath);
@@ -678,12 +548,12 @@ export const JSXParsers: {
       }
     }
 
-    if (stroke) {
-      stroke = parseColor(stroke);
-    }
-
-    if (fill && fill !== 'none') {
-      fill = parseColor(fill);
+    if (fill) {
+      if (fill !== 'none') {
+        fill = parseColor(fill);
+      } else {
+        fill = undefined;
+      }
     } else {
       fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
     }
@@ -692,57 +562,36 @@ export const JSXParsers: {
       mixBlendMode = camel(mixBlendMode);
       mixBlendMode =
         mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
-    }
-
-    if (transform) {
-      transform = parseTransform(transform);
     }
 
     return removeUndefined({
       type: 'ellipse',
-      cx: parseFloat(cx),
-      cy: parseFloat(cy),
-      rx: parseFloat(rx),
-      ry: parseFloat(ry),
+      cx: parseFloat(props.cx),
+      cy: parseFloat(props.cy),
+      rx: parseFloat(props.rx),
+      ry: parseFloat(props.ry),
       clipPath: clipPath,
-      clipRule: clipRule,
+      clipRule: attr.clipRule,
       fill: fill,
-      fillRule: fillRule,
-      stroke: stroke,
-      strokeWidth: strokeWidth,
-      strokeDashArray: strokeDashArray,
-      strokeDashOffset: strokeDashOffset,
-      opacity: opacity,
-      strokeOpacity: strokeOpacity,
+      fillRule: attr.fillRule,
+      stroke:
+        attr.stroke && attr.stroke !== 'none'
+          ? parseColor(attr.stroke)
+          : undefined,
+      strokeWidth: attr.strokeWidth,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: attr.strokeDashOffset,
+      opacity: attr.opacity,
+      strokeOpacity: attr.strokeOpacity,
       mixBlendMode: mixBlendMode,
-      transform: transform,
+      transform: parseTransform(props.transform),
     });
   },
 
   rect(props: any, _: PDFDocument): Rect {
-    let { x, y, width, height, rx, ry, style, transform } = props;
-    const attributes = hierarchy(props, this.internalCSS, style);
+    const attr = hierarchy(props, this.internalCSS, props.style);
 
-    x = parseFloat(x);
-    y = parseFloat(y);
-    width = parseFloat(width);
-    height = parseFloat(height);
-    rx = rx ? parseFloat(rx) : undefined;
-    ry = ry ? parseFloat(ry) : undefined;
-
-    let {
-      clipPath,
-      clipRule,
-      fill,
-      fillRule,
-      stroke,
-      strokeWidth,
-      strokeDashArray,
-      strokeDashOffset,
-      opacity,
-      strokeOpacity,
-      mixBlendMode,
-    } = attributes;
+    let { clipPath, fill, mixBlendMode } = attr;
 
     if (clipPath) {
       const match = /url\((.*)\)/g.exec(clipPath);
@@ -751,12 +600,12 @@ export const JSXParsers: {
       }
     }
 
-    if (stroke) {
-      stroke = parseColor(stroke);
-    }
-
-    if (fill && fill !== 'none') {
-      fill = parseColor(fill);
+    if (fill) {
+      if (fill !== 'none') {
+        fill = parseColor(fill);
+      } else {
+        fill = undefined;
+      }
     } else {
       fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
     }
@@ -767,53 +616,36 @@ export const JSXParsers: {
         mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
     }
 
-    if (transform) {
-      transform = parseTransform(transform);
-    }
-
     return removeUndefined({
       type: 'rect',
-      x: x,
-      y: y,
-      width: width,
-      height: height,
-      rx: rx,
-      ry: ry,
+      x: parseFloat(props.x),
+      y: parseFloat(props.y),
+      width: parseFloat(props.width),
+      height: parseFloat(props.height),
+      rx: props.rx ? parseFloat(props.rx) : undefined,
+      ry: props.ry ? parseFloat(props.ry) : undefined,
       clipPath: clipPath,
-      clipRule: clipRule,
+      clipRule: attr.clipRule,
       fill: fill,
-      fillRule: fillRule,
-      stroke: stroke,
-      strokeWidth: strokeWidth,
-      strokeDashArray: strokeDashArray,
-      strokeDashOffset: strokeDashOffset,
-      opacity: opacity,
-      strokeOpacity: strokeOpacity,
+      fillRule: attr.fillRule,
+      stroke:
+        attr.stroke && attr.stroke !== 'none'
+          ? parseColor(attr.stroke)
+          : undefined,
+      strokeWidth: attr.strokeWidth,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: attr.strokeDashOffset,
+      opacity: attr.opacity,
+      strokeOpacity: attr.strokeOpacity,
       mixBlendMode: mixBlendMode,
-      transform: transform,
+      transform: parseTransform(props.transform),
     });
   },
 
   line(props: any, _: PDFDocument): Line {
-    let { x1, y1, x2, y2, style, transform } = props;
-    const attributes = hierarchy(props, this.internalCSS, style);
+    const attr = hierarchy(props, this.internalCSS, props.style);
 
-    x1 = parseFloat(x1);
-    y1 = parseFloat(y1);
-    x2 = parseFloat(x2);
-    y2 = parseFloat(y2);
-
-    let {
-      clipPath,
-      clipRule,
-      stroke,
-      strokeWidth,
-      strokeDashArray,
-      strokeDashOffset,
-      opacity,
-      strokeOpacity,
-      mixBlendMode,
-    } = attributes;
+    let { clipPath, mixBlendMode } = attr;
 
     if (clipPath) {
       const match = /url\((.*)\)/g.exec(clipPath);
@@ -822,36 +654,31 @@ export const JSXParsers: {
       }
     }
 
-    if (stroke) {
-      stroke = parseColor(stroke);
-    }
-
     if (mixBlendMode) {
       mixBlendMode = camel(mixBlendMode);
       mixBlendMode =
         mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
     }
 
-    if (transform) {
-      transform = parseTransform(transform);
-    }
-
     return removeUndefined({
       type: 'line',
-      x1: x1,
-      y1: y1,
-      x2: x2,
-      y2: y2,
+      x1: parseFloat(props.x1),
+      y1: parseFloat(props.y1),
+      x2: parseFloat(props.x2),
+      y2: parseFloat(props.y2),
       clipPath: clipPath,
-      clipRule: clipRule,
-      stroke: stroke,
-      strokeWidth: strokeWidth,
-      strokeDashArray: strokeDashArray,
-      strokeDashOffset: strokeDashOffset,
-      opacity: opacity,
-      strokeOpacity: strokeOpacity,
+      clipRule: attr.clipRule,
+      stroke:
+        attr.stroke && attr.stroke !== 'none'
+          ? parseColor(attr.stroke)
+          : undefined,
+      strokeWidth: attr.strokeWidth,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: attr.strokeDashOffset,
+      opacity: attr.opacity,
+      strokeOpacity: attr.strokeOpacity,
       mixBlendMode: mixBlendMode,
-      transform: transform,
+      transform: parseTransform(props.transform),
     });
   },
 
