@@ -3,7 +3,7 @@ import { PDFImage, BlendMode } from 'src/api';
 import React from 'react';
 import PDFDocument from './PDFDocument';
 import { Color, ColorTypes, RGB, CMYK } from 'src/api/colors';
-import { line, circle, ellipse, rect, path } from 'src/api/shape';
+import { line, circle, ellipse, rect, path, shape } from 'src/api/shape';
 import { transform } from 'src/api/transform';
 import { PDFOperator } from 'src/core';
 
@@ -576,12 +576,12 @@ export const JSXParsers: {
     };
   },
 
-  defs(props: any, doc: PDFDocument) {
+  defs(props: any, doc: PDFDocument): void {
     let children = React.Children.toArray(props.children);
     children.forEach(({ type, props }: any) => this[type](props, doc));
   },
 
-  style(props: any, _: PDFDocument) {
+  style(props: any, _: PDFDocument): void {
     const string = props.children;
     let regCls = /.(.*?){(.*?)}/g,
       cls;
@@ -641,7 +641,7 @@ export const JSXParsers: {
 
   async clippath(props: any, doc: PDFDocument) {
     let children = React.Children.toArray(props.children);
-    this.definitions['#' + props.id] = {
+    this.definitions['#' + props.id] = shape({
       type: 'group',
       children: (
         await Promise.all(
@@ -652,6 +652,6 @@ export const JSXParsers: {
           ),
         )
       ).filter(Boolean) as PDFGraphic[],
-    };
+    });
   },
 };

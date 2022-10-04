@@ -12,6 +12,7 @@ import {
 } from 'src/api/operators';
 import { translate } from 'src/api/transform';
 import { PDFOperator } from 'src/core';
+import PDFGraphic from './PDFGraphic';
 
 let cx: number = 0;
 let cy: number = 0;
@@ -502,6 +503,7 @@ export const rect = (
   const W = width;
   const H = height;
   const RX = rx ?? 0;
+  if (ry) console.log(ry);
   //   let RY = options.ry ?? 0;
   //   if (RX && !options.ry) {
   //     RY = RX;
@@ -581,3 +583,18 @@ export const line = (x1: number, y1: number, x2: number, y2: number) => [
   lineTo(x2, y2),
   closePath(),
 ];
+
+export const shape = (g: PDFGraphic): PDFOperator[] => {
+  const ops: (PDFOperator | undefined)[] = [];
+  switch (g.type) {
+    case 'group':
+      g.children.forEach((gr) => ops.push(...shape(gr)));
+      break;
+    case 'shape':
+      ops.push(...g.operators);
+      break;
+    default:
+      throw 'Graphic is not a shape';
+  }
+  return ops.filter(Boolean) as PDFOperator[];
+};

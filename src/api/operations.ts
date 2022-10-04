@@ -298,8 +298,6 @@ export const drawCircle = (options: {
   cx: number | PDFNumber;
   cy: number | PDFNumber;
   r: number | PDFNumber;
-  rotate?: Rotation;
-  origin?: [number | PDFNumber, number | PDFNumber];
   fill?: Color;
   fillRule?: 'nonzero' | 'evenodd';
   stroke?: Color;
@@ -323,8 +321,6 @@ export const drawCircle = (options: {
       ),
 
     ...circle(asNumber(options.cx), asNumber(options.cy), asNumber(options.r)),
-
-    closePath(),
 
     // prettier-ignore
     options.fill && options.stroke ? fillAndStroke(options.fillRule)
