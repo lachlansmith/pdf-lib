@@ -157,4 +157,6 @@ export interface PDFPageDrawOptions {
   scale?: number;
 }
 
+export interface PDFPageApplyOptions {}
+
 export interface PDFPageDrawGraphicOptions {}

@@ -31,7 +31,6 @@ import {
   PDFPageDrawPathOptions,
   PDFPageDrawTextOptions,
   PDFPageDrawOptions,
-  //   PDFPageDrawGraphicOptions,
   BlendMode,
 } from 'src/api/PDFPageOptions';
 import { degrees, Rotation, toDegrees } from 'src/api/rotations';
@@ -1554,6 +1553,24 @@ export default class PDFPage {
         scale: options.scale || 1,
       }),
     );
+  }
+
+  /**
+   * Draw an SVG on this page. For example:
+   * ```js
+   * const svg = '<svg><path d="M 0,20 L 100,160 Q 130,200 150,120 C 190,-40 200,200 300,150 L 400,90"></path></svg>'
+   *
+   * // Draw svg
+   * page.drawSvg(svg, { x: 25, y: 75 })
+   * ```
+   * @param svg The SVG to be drawn.
+   * @param options The options to be used when drawing the SVG.
+   */
+  apply(operators: PDFOperator[]): void {
+    // assertIs(operators, 'graphic', [[Object, 'PDFGraphic']]);
+
+    const contentStream = this.getContentStream();
+    contentStream.push(...operators);
   }
 
   getFont(): [PDFFont, PDFName] {

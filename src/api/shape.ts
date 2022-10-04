@@ -10,6 +10,7 @@ import {
   lineTo,
   moveTo,
 } from 'src/api/operators';
+import { translate } from 'src/api/transform';
 import { PDFOperator } from 'src/core';
 
 let cx: number = 0;
@@ -486,4 +487,97 @@ const segmentToBezier = (
   return result;
 };
 
-export const pathToOperators = (path: string) => apply(parse(path));
+export const path = (path: string) => apply(parse(path));
+
+export const rect = (
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  rx?: number,
+  ry?: number,
+) => {
+  const X = x;
+  const Y = y;
+  const W = width;
+  const H = height;
+  const RX = rx ?? 0;
+  //   let RY = options.ry ?? 0;
+  //   if (RX && !options.ry) {
+  //     RY = RX;
+  //   }
+  const KAPPA = 4.0 * ((Math.sqrt(2) - 1.0) / 3.0);
+  const CX = RX * (1.0 - KAPPA);
+  //   const CY = RY * (1.0 - KAPPA);
+  return [
+    translate(X, Y),
+    moveTo(RX, 0),
+    lineTo(W - RX, 0),
+    RX > 0 ? appendBezierCurve(W - CX, 0, W, CX, W, RX) : undefined,
+    lineTo(W, H - RX),
+    RX > 0 ? appendBezierCurve(W, H - CX, W - CX, H, W - RX, H) : undefined,
+    lineTo(RX, H),
+    RX > 0 ? appendBezierCurve(CX, H, 0, H - CX, 0, H - RX) : undefined,
+    RX > 0 ? lineTo(0, RX) : undefined,
+    RX > 0 ? appendBezierCurve(0, CX, CX, 0, RX, 0) : undefined,
+    closePath(),
+  ].filter(Boolean) as PDFOperator[];
+};
+
+export const arc = (options: {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  rot: number;
+  large: number;
+  sweep: number;
+  ex: number;
+  ey: number;
+}) => {
+  return [
+    moveTo(options.x, options.y),
+    ...solveArc(options.x, options.y, [
+      options.rx,
+      options.ry,
+      options.rot,
+      options.large,
+      options.sweep,
+      options.ex + options.x,
+      options.ey + options.y,
+    ]),
+    closePath(),
+  ].filter(Boolean) as PDFOperator[];
+};
+
+export const ellipse = (cx: number, cy: number, rx: number, ry: number) =>
+  arc({
+    x: cx,
+    y: cy - ry,
+    rx: rx,
+    ry: ry,
+    rot: 0,
+    large: 1,
+    sweep: 0,
+    ex: 1,
+    ey: 0,
+  });
+
+export const circle = (cx: number, cy: number, r: number) =>
+  arc({
+    x: cx,
+    y: cy - r,
+    rx: r,
+    ry: r,
+    rot: 0,
+    large: 1,
+    sweep: 0,
+    ex: 1,
+    ey: 0,
+  });
+
+export const line = (x1: number, y1: number, x2: number, y2: number) => [
+  moveTo(x1, y1),
+  lineTo(x2, y2),
+  closePath(),
+];

@@ -1234,10 +1234,11 @@ export default class PDFDocument {
   }
 
   async parseJsx(jsx: React.ReactElement): Promise<PDFGraphic> {
-    const parser = JSXParsers[jsx.type.toString()];
+    const tagName = jsx.type.toString();
+    const parser = JSXParsers[tagName];
 
     return typeof parser === 'function'
-      ? await JSXParsers[jsx.type.toString()](jsx.props, this)
+      ? await JSXParsers[tagName](jsx.props, this)
       : undefined;
   }
 
