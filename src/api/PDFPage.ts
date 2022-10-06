@@ -12,10 +12,9 @@ import {
 import {
   popGraphicsState,
   pushGraphicsState,
-  translate,
   LineCapStyle,
-  scale,
 } from 'src/api/operators';
+import { translate, scale } from 'src/api/transform';
 import PDFDocument from 'src/api/PDFDocument';
 import PDFEmbeddedPage from 'src/api/PDFEmbeddedPage';
 import PDFFont from 'src/api/PDFFont';

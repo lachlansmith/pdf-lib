@@ -39,51 +39,6 @@ export const concatTransformationMatrix = (
     asPDFNumber(f),
   ]);
 
-export const matrix = (
-  a: number | PDFNumber,
-  b: number | PDFNumber,
-  c: number | PDFNumber,
-  d: number | PDFNumber,
-  e: number | PDFNumber,
-  f: number | PDFNumber,
-) => concatTransformationMatrix(a, b, c, d, e, f);
-
-export const translate = (tx: number | PDFNumber, ty: number | PDFNumber) =>
-  concatTransformationMatrix(1, 0, 0, 1, tx, ty);
-
-export const translateX = (tx: number | PDFNumber) =>
-  concatTransformationMatrix(1, 0, 0, 1, tx, 0);
-
-export const translateY = (ty: number | PDFNumber) =>
-  concatTransformationMatrix(1, 0, 0, 1, 0, ty);
-
-export const rotate = (angle: number | PDFNumber) => rotateDegrees(angle);
-
-export const scale = (sx: number | PDFNumber, sy: number | PDFNumber) =>
-  concatTransformationMatrix(sx, 0, 0, sy, 0, 0);
-
-export const scaleX = (xPos: number | PDFNumber) =>
-  concatTransformationMatrix(xPos, 0, 0, 0, 0, 0);
-
-export const scaleY = (yPos: number | PDFNumber) =>
-  concatTransformationMatrix(0, 0, 0, yPos, 0, 0);
-
-export const skew = (skx: number | PDFNumber, sky: number | PDFNumber) =>
-  concatTransformationMatrix(
-    1,
-    tan(asNumber(skx)),
-    tan(asNumber(sky)),
-    1,
-    0,
-    0,
-  );
-
-export const skewX = (skx: number | PDFNumber) =>
-  concatTransformationMatrix(1, tan(asNumber(skx)), 0, 1, 0, 0);
-
-export const skewY = (sky: number | PDFNumber) =>
-  concatTransformationMatrix(1, 0, tan(asNumber(sky)), 1, 0, 0);
-
 export const rotateRadians = (angle: number | PDFNumber) =>
   concatTransformationMatrix(
     cos(asNumber(angle)),

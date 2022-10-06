@@ -130,7 +130,11 @@ export const JSXParsers: {
   definitions: {},
 
   async svg(props: any, doc: PDFDocument) {
-    const attr = hierarchy(props, this.internalCSS, props.style);
+    const attr = hierarchy(
+      props,
+      this.internalCSS,
+      props.style ? props.style : {},
+    );
 
     let { clipPath, mixBlendMode } = attr;
 
@@ -177,7 +181,11 @@ export const JSXParsers: {
   },
 
   async g(props: any, doc: PDFDocument) {
-    const attr = hierarchy(props, this.internalCSS, props.style);
+    const attr = hierarchy(
+      props,
+      this.internalCSS,
+      props.style ? props.style : {},
+    );
 
     let { clipPath, mixBlendMode } = attr;
 
@@ -234,11 +242,15 @@ export const JSXParsers: {
   },
 
   ['Symbol(react.fragment)'](props: any, doc: PDFDocument) {
-    return this['g'](props.children.props, doc);
+    return this['g'](props, doc);
   },
 
   path(props: any, _: PDFDocument): Shape {
-    const attr = hierarchy(props, this.internalCSS, props.style);
+    const attr = hierarchy(
+      props,
+      this.internalCSS,
+      props.style ? props.style : {},
+    );
 
     let { clipPath, fill, mixBlendMode } = attr;
 
@@ -287,7 +299,11 @@ export const JSXParsers: {
   },
 
   polyline(props: any, _: PDFDocument): Shape {
-    const attr = hierarchy(props, this.internalCSS, props.style);
+    const attr = hierarchy(
+      props,
+      this.internalCSS,
+      props.style ? props.style : {},
+    );
 
     let { clipPath, mixBlendMode } = attr;
 
@@ -324,7 +340,11 @@ export const JSXParsers: {
   },
 
   polygon(props: any, _: PDFDocument): Shape {
-    const attr = hierarchy(props, this.internalCSS, props.style);
+    const attr = hierarchy(
+      props,
+      this.internalCSS,
+      props.style ? props.style : {},
+    );
 
     let { clipPath, fill, mixBlendMode } = attr;
 
@@ -373,7 +393,11 @@ export const JSXParsers: {
   },
 
   circle(props: any, _: PDFDocument): Shape {
-    const attr = hierarchy(props, this.internalCSS, props.style);
+    const attr = hierarchy(
+      props,
+      this.internalCSS,
+      props.style ? props.style : {},
+    );
     let { clipPath, fill, mixBlendMode } = attr;
 
     if (clipPath) {
@@ -425,7 +449,11 @@ export const JSXParsers: {
   },
 
   ellipse(props: any, _: PDFDocument): Shape {
-    const attr = hierarchy(props, this.internalCSS, props.style);
+    const attr = hierarchy(
+      props,
+      this.internalCSS,
+      props.style ? props.style : {},
+    );
 
     let { clipPath, fill, mixBlendMode } = attr;
 
@@ -479,7 +507,11 @@ export const JSXParsers: {
   },
 
   rect(props: any, _: PDFDocument): Shape {
-    const attr = hierarchy(props, this.internalCSS, props.style);
+    const attr = hierarchy(
+      props,
+      this.internalCSS,
+      props.style ? props.style : {},
+    );
 
     let { clipPath, fill, mixBlendMode } = attr;
 
@@ -535,7 +567,11 @@ export const JSXParsers: {
   },
 
   line(props: any, _: PDFDocument): Shape {
-    const attr = hierarchy(props, this.internalCSS, props.style);
+    const attr = hierarchy(
+      props,
+      this.internalCSS,
+      props.style ? props.style : {},
+    );
 
     let { clipPath, mixBlendMode } = attr;
 

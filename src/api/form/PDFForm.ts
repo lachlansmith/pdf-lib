@@ -21,8 +21,8 @@ import {
   drawObject,
   popGraphicsState,
   pushGraphicsState,
-  translate,
 } from 'src/api/operators';
+import { translate } from 'src/api/transform';
 import {
   PDFAcroForm,
   PDFAcroField,
