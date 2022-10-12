@@ -12,7 +12,7 @@ import {
 } from 'src/api/operators';
 import { translate } from 'src/api/transform';
 import { PDFOperator } from 'src/core';
-import PDFGraphic from './PDFGraphic';
+import { Shape, Group } from './PDFGraphic';
 
 let cx: number = 0;
 let cy: number = 0;
@@ -584,14 +584,17 @@ export const line = (x1: number, y1: number, x2: number, y2: number) => [
   closePath(),
 ];
 
-export const shape = (g: PDFGraphic): PDFOperator[] => {
+export const shape = (s: Shape | Group): PDFOperator[] => {
   const ops: (PDFOperator | undefined)[] = [];
-  switch (g.type) {
+  switch (s.type) {
     case 'group':
-      g.children.forEach((gr) => ops.push(...shape(gr)));
+      s.children.forEach(
+        (g) =>
+          (g.type === 'shape' || g.type === 'group') && ops.push(...shape(g)),
+      );
       break;
     case 'shape':
-      ops.push(...g.operators);
+      ops.push(...s.operators);
       break;
     default:
       throw 'Graphic is not a shape';

@@ -11,14 +11,14 @@ import ColorParser from 'color';
 
 interface Base {
   transform?: PDFOperator[];
-  clip?: PDFOperator[];
+  clipPath?: PDFOperator[];
   clipRule?: 'nonzero' | 'evenodd';
   opacity?: number;
   strokeOpacity?: number;
   mixBlendMode?: BlendMode;
 }
 
-interface Shape extends Base {
+export interface Shape extends Base {
   type: 'shape';
   operators: PDFOperator[];
   fill?: Color;
@@ -44,6 +44,13 @@ export interface Image extends Base {
 
 export interface Group extends Base {
   type: 'group';
+  fill?: Color;
+  fillRule?: 'nonzero' | 'evenodd';
+  stroke?: Color;
+  strokeWidth?: number;
+  strokeDashArray?: number[];
+  strokeDashOffset?: number;
+  strokeLineCap?: LineCapStyle;
   children: PDFGraphic[];
 }
 
@@ -84,43 +91,44 @@ const parseColor = (
   }
 };
 
-const hierarchy = (
-  {
-    clipPath,
-    clipRule,
-    fillRule,
-    fill,
-    stroke,
-    strokeWidth,
-    strokeDashArray,
-    strokeDashOffset,
-    className,
-  }: any,
-  internalCSS: any,
-  style: any,
-) => {
-  let css = {};
-  if (className) {
-    const names = className.split(' ');
+const hierarchy = (props: any, internalCss: any, inlineStyle: any) => {
+  // construct styles classes from listed class names
+  let classes = {};
+  if (props.className) {
+    const names = props.className.split(' '); // multiple internal styles
 
     names.forEach((name: string) => {
-      if (!(name in internalCSS)) return;
-      css = { ...css, ...internalCSS[name] };
+      if (!(name in internalCss)) return;
+      classes = { ...classes, ...internalCss[name] };
     });
   }
 
-  return {
-    clipPath,
-    clipRule,
-    fill,
-    fillRule,
-    stroke,
-    strokeWidth,
-    strokeDashArray,
-    strokeDashOffset,
-    ...css,
-    ...style,
+  // construct the presentation attributes based on style hierarchy
+  const presentationAttributes = {
+    ...{
+      clipPath: props.clipPath,
+      clipRule: props.clipRule,
+      fill: props.fill,
+      fileRule: props.fileRule,
+      stroke: props.stroke,
+      strokeWidth: props.strokeWidth,
+      strokeDashArray: props.strokeDashArray,
+      strokeDashOffset: props.strokeDashOffset,
+      strokeOpacity: props.strokeOpacity,
+      opacity: props.opacity,
+    },
+    ...classes,
+    ...inlineStyle,
   };
+
+  // delete undefined keys
+  Object.keys(presentationAttributes).forEach(
+    (key) =>
+      presentationAttributes[key] === undefined &&
+      delete presentationAttributes[key],
+  );
+
+  return presentationAttributes;
 };
 
 export const JSXParsers: {
@@ -129,26 +137,26 @@ export const JSXParsers: {
   internalCSS: {},
   definitions: {},
 
-  async svg(props: any, doc: PDFDocument) {
-    const attr = hierarchy(
+  async svg(props: any, doc: PDFDocument): Promise<Group> {
+    const presentationAttributes = hierarchy(
       props,
       this.internalCSS,
       props.style ? props.style : {},
     );
 
-    let { clipPath, mixBlendMode } = attr;
-
-    if (clipPath) {
-      const match = /url\((.*)\)/g.exec(clipPath);
+    let clipPath;
+    if (presentationAttributes.clipPath) {
+      const match = /url\((.*)\)/g.exec(presentationAttributes.clipPath);
       if (match) {
         clipPath = this.definitions[match[1]];
       }
     }
 
-    if (mixBlendMode) {
-      mixBlendMode = camel(mixBlendMode);
-      mixBlendMode =
-        mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
+    let mixBlendMode;
+    if (presentationAttributes.mixBlendMode) {
+      mixBlendMode = camel(presentationAttributes.mixBlendMode);
+      mixBlendMode = (mixBlendMode.charAt(0).toUpperCase() +
+        mixBlendMode.slice(1)) as BlendMode;
     }
 
     let children: (PDFGraphic | undefined)[] = [];
@@ -171,35 +179,35 @@ export const JSXParsers: {
     return {
       type: 'group',
       clipPath: clipPath,
-      clipRule: attr.clipRule,
-      opacity: attr.opacity,
-      strokeOpacity: attr.strokeOpacity,
+      clipRule: presentationAttributes.clipRule,
+      opacity: presentationAttributes.opacity,
+      strokeOpacity: presentationAttributes.strokeOpacity,
       mixBlendMode: mixBlendMode,
       transform: transform(props.transform),
       children: children.filter(Boolean) as PDFGraphic[],
     };
   },
 
-  async g(props: any, doc: PDFDocument) {
-    const attr = hierarchy(
+  async g(props: any, doc: PDFDocument): Promise<Group> {
+    const presentationAttributes = hierarchy(
       props,
       this.internalCSS,
       props.style ? props.style : {},
     );
 
-    let { clipPath, mixBlendMode } = attr;
-
-    if (clipPath) {
-      const match = /url\((.*)\)/g.exec(clipPath);
+    let clipPath;
+    if (presentationAttributes.clipPath) {
+      const match = /url\((.*)\)/g.exec(presentationAttributes.clipPath);
       if (match) {
         clipPath = this.definitions[match[1]];
       }
     }
 
-    if (mixBlendMode) {
-      mixBlendMode = camel(mixBlendMode);
-      mixBlendMode =
-        mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
+    let mixBlendMode;
+    if (presentationAttributes.mixBlendMode) {
+      mixBlendMode = camel(presentationAttributes.mixBlendMode);
+      mixBlendMode = (mixBlendMode.charAt(0).toUpperCase() +
+        mixBlendMode.slice(1)) as BlendMode;
     }
 
     let children: (PDFGraphic | undefined)[] = [];
@@ -222,19 +230,22 @@ export const JSXParsers: {
     return {
       type: 'group',
       clipPath: clipPath,
-      clipRule: attr.clipRule,
+      clipRule: presentationAttributes.clipRule,
       fill:
-        attr.fill && attr.fill !== 'none' ? parseColor(attr.fill) : undefined,
-      fillRule: attr.fillRule,
-      stroke:
-        attr.stroke && attr.stroke !== 'none'
-          ? parseColor(attr.stroke)
+        presentationAttributes.fill && presentationAttributes.fill !== 'none'
+          ? parseColor(presentationAttributes.fill)
           : undefined,
-      strokeWidth: attr.strokeWidth,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: attr.strokeDashOffset,
-      opacity: attr.opacity,
-      strokeOpacity: attr.strokeOpacity,
+      fillRule: presentationAttributes.fillRule,
+      stroke:
+        presentationAttributes.stroke &&
+        presentationAttributes.stroke !== 'none'
+          ? parseColor(presentationAttributes.stroke)
+          : undefined,
+      strokeWidth: presentationAttributes.strokeWidth,
+      strokeDashArray: presentationAttributes.strokeDashArray,
+      strokeDashOffset: presentationAttributes.strokeDashOffset,
+      opacity: presentationAttributes.opacity,
+      strokeOpacity: presentationAttributes.strokeOpacity,
       mixBlendMode: mixBlendMode,
       transform: transform(props.transform),
       children: children.filter(Boolean) as PDFGraphic[],
@@ -246,24 +257,16 @@ export const JSXParsers: {
   },
 
   path(props: any, _: PDFDocument): Shape {
-    const attr = hierarchy(
+    const presentationAttributes = hierarchy(
       props,
       this.internalCSS,
       props.style ? props.style : {},
     );
 
-    let { clipPath, fill, mixBlendMode } = attr;
-
-    if (clipPath) {
-      const match = /url\((.*)\)/g.exec(clipPath);
-      if (match) {
-        clipPath = this.definitions[match[1]];
-      }
-    }
-
-    if (fill) {
-      if (fill !== 'none') {
-        fill = parseColor(fill);
+    let fill: Color | undefined;
+    if (presentationAttributes.fill) {
+      if (presentationAttributes.fill !== 'none') {
+        fill = parseColor(presentationAttributes.fill);
       } else {
         fill = undefined;
       }
@@ -271,93 +274,96 @@ export const JSXParsers: {
       fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
     }
 
-    if (mixBlendMode) {
-      mixBlendMode = camel(mixBlendMode);
-      mixBlendMode =
-        mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
+    let clipPath;
+    if (presentationAttributes.clipPath) {
+      const match = /url\((.*)\)/g.exec(presentationAttributes.clipPath);
+      if (match) {
+        clipPath = this.definitions[match[1]];
+      }
+    }
+
+    let mixBlendMode;
+    if (presentationAttributes.mixBlendMode) {
+      mixBlendMode = camel(presentationAttributes.mixBlendMode);
+      mixBlendMode = (mixBlendMode.charAt(0).toUpperCase() +
+        mixBlendMode.slice(1)) as BlendMode;
     }
 
     return {
       type: 'shape',
       operators: path(props.d),
-      clip: clipPath,
-      clipRule: attr.clipRule,
+      clipPath: clipPath,
+      clipRule: presentationAttributes.clipRule,
       fill: fill,
-      fillRule: attr.fillRule,
+      fillRule: presentationAttributes.fillRule,
       stroke:
-        attr.stroke && attr.stroke !== 'none'
-          ? parseColor(attr.stroke)
+        presentationAttributes.stroke &&
+        presentationAttributes.stroke !== 'none'
+          ? parseColor(presentationAttributes.stroke)
           : undefined,
-      strokeWidth: attr.strokeWidth,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: attr.strokeDashOffset,
-      opacity: attr.opacity,
-      strokeOpacity: attr.strokeOpacity,
+      strokeWidth: presentationAttributes.strokeWidth,
+      strokeDashArray: presentationAttributes.strokeDashArray,
+      strokeDashOffset: presentationAttributes.strokeDashOffset,
+      opacity: presentationAttributes.opacity,
+      strokeOpacity: presentationAttributes.strokeOpacity,
       mixBlendMode: mixBlendMode,
       transform: transform(props.transform),
     };
   },
 
   polyline(props: any, _: PDFDocument): Shape {
-    const attr = hierarchy(
+    const presentationAttributes = hierarchy(
       props,
       this.internalCSS,
       props.style ? props.style : {},
     );
 
-    let { clipPath, mixBlendMode } = attr;
-
-    if (clipPath) {
-      const match = /url\((.*)\)/g.exec(clipPath);
+    let clipPath;
+    if (presentationAttributes.clipPath) {
+      const match = /url\((.*)\)/g.exec(presentationAttributes.clipPath);
       if (match) {
         clipPath = this.definitions[match[1]];
       }
     }
 
-    if (mixBlendMode) {
-      mixBlendMode = camel(mixBlendMode);
-      mixBlendMode =
-        mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
+    let mixBlendMode;
+    if (presentationAttributes.mixBlendMode) {
+      mixBlendMode = camel(presentationAttributes.mixBlendMode);
+      mixBlendMode = (mixBlendMode.charAt(0).toUpperCase() +
+        mixBlendMode.slice(1)) as BlendMode;
     }
 
     return {
       type: 'shape',
       operators: path('M' + props.points),
-      clip: clipPath,
-      clipRule: attr.clipRule,
+      clipPath: clipPath,
+      clipRule: presentationAttributes.clipRule,
       stroke:
-        attr.stroke && attr.stroke !== 'none'
-          ? parseColor(attr.stroke)
+        presentationAttributes.stroke &&
+        presentationAttributes.stroke !== 'none'
+          ? parseColor(presentationAttributes.stroke)
           : undefined,
-      strokeWidth: attr.strokeWidth,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: attr.strokeDashOffset,
-      opacity: attr.opacity,
-      strokeOpacity: attr.strokeOpacity,
+      strokeWidth: presentationAttributes.strokeWidth,
+      strokeDashArray: presentationAttributes.strokeDashArray,
+      strokeDashOffset: presentationAttributes.strokeDashOffset,
+      opacity: presentationAttributes.opacity,
+      strokeOpacity: presentationAttributes.strokeOpacity,
       mixBlendMode: mixBlendMode,
       transform: transform(props.transform),
     };
   },
 
   polygon(props: any, _: PDFDocument): Shape {
-    const attr = hierarchy(
+    const presentationAttributes = hierarchy(
       props,
       this.internalCSS,
       props.style ? props.style : {},
     );
 
-    let { clipPath, fill, mixBlendMode } = attr;
-
-    if (clipPath) {
-      const match = /url\((.*)\)/g.exec(clipPath);
-      if (match) {
-        clipPath = this.definitions[match[1]];
-      }
-    }
-
-    if (fill) {
-      if (fill !== 'none') {
-        fill = parseColor(fill);
+    let fill: Color | undefined;
+    if (presentationAttributes.fill) {
+      if (presentationAttributes.fill !== 'none') {
+        fill = parseColor(presentationAttributes.fill);
       } else {
         fill = undefined;
       }
@@ -365,51 +371,54 @@ export const JSXParsers: {
       fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
     }
 
-    if (mixBlendMode) {
-      mixBlendMode = camel(mixBlendMode);
-      mixBlendMode =
-        mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
+    let clipPath;
+    if (presentationAttributes.clipPath) {
+      const match = /url\((.*)\)/g.exec(presentationAttributes.clipPath);
+      if (match) {
+        clipPath = this.definitions[match[1]];
+      }
+    }
+
+    let mixBlendMode;
+    if (presentationAttributes.mixBlendMode) {
+      mixBlendMode = camel(presentationAttributes.mixBlendMode);
+      mixBlendMode = (mixBlendMode.charAt(0).toUpperCase() +
+        mixBlendMode.slice(1)) as BlendMode;
     }
 
     return {
       type: 'shape',
       operators: path('M' + props.points + 'z'),
-      clip: clipPath,
-      clipRule: attr.clipRule,
+      clipPath: clipPath,
+      clipRule: presentationAttributes.clipRule,
       fill: fill,
-      fillRule: attr.fillRule,
+      fillRule: presentationAttributes.fillRule,
       stroke:
-        attr.stroke && attr.stroke !== 'none'
-          ? parseColor(attr.stroke)
+        presentationAttributes.stroke &&
+        presentationAttributes.stroke !== 'none'
+          ? parseColor(presentationAttributes.stroke)
           : undefined,
-      strokeWidth: attr.strokeWidth,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: attr.strokeDashOffset,
-      opacity: attr.opacity,
-      strokeOpacity: attr.strokeOpacity,
+      strokeWidth: presentationAttributes.strokeWidth,
+      strokeDashArray: presentationAttributes.strokeDashArray,
+      strokeDashOffset: presentationAttributes.strokeDashOffset,
+      opacity: presentationAttributes.opacity,
+      strokeOpacity: presentationAttributes.strokeOpacity,
       mixBlendMode: mixBlendMode,
       transform: transform(props.transform),
     };
   },
 
   circle(props: any, _: PDFDocument): Shape {
-    const attr = hierarchy(
+    const presentationAttributes = hierarchy(
       props,
       this.internalCSS,
       props.style ? props.style : {},
     );
-    let { clipPath, fill, mixBlendMode } = attr;
 
-    if (clipPath) {
-      const match = /url\((.*)\)/g.exec(clipPath);
-      if (match) {
-        clipPath = this.definitions[match[1]];
-      }
-    }
-
-    if (fill) {
-      if (fill !== 'none') {
-        fill = parseColor(fill);
+    let fill: Color | undefined;
+    if (presentationAttributes.fill) {
+      if (presentationAttributes.fill !== 'none') {
+        fill = parseColor(presentationAttributes.fill);
       } else {
         fill = undefined;
       }
@@ -417,10 +426,19 @@ export const JSXParsers: {
       fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
     }
 
-    if (mixBlendMode) {
-      mixBlendMode = camel(mixBlendMode);
-      mixBlendMode =
-        mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
+    let clipPath;
+    if (presentationAttributes.clipPath) {
+      const match = /url\((.*)\)/g.exec(presentationAttributes.clipPath);
+      if (match) {
+        clipPath = this.definitions[match[1]];
+      }
+    }
+
+    let mixBlendMode;
+    if (presentationAttributes.mixBlendMode) {
+      mixBlendMode = camel(presentationAttributes.mixBlendMode);
+      mixBlendMode = (mixBlendMode.charAt(0).toUpperCase() +
+        mixBlendMode.slice(1)) as BlendMode;
     }
 
     return {
@@ -430,43 +448,36 @@ export const JSXParsers: {
         parseFloat(props.cy),
         parseFloat(props.r),
       ),
-      clip: clipPath,
-      clipRule: attr.clipRule,
+      clipPath: clipPath,
+      clipRule: presentationAttributes.clipRule,
       fill: fill,
-      fillRule: attr.fillRule,
+      fillRule: presentationAttributes.fillRule,
       stroke:
-        attr.stroke && attr.stroke !== 'none'
-          ? parseColor(attr.stroke)
+        presentationAttributes.stroke &&
+        presentationAttributes.stroke !== 'none'
+          ? parseColor(presentationAttributes.stroke)
           : undefined,
-      strokeWidth: attr.strokeWidth,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: attr.strokeDashOffset,
-      opacity: attr.opacity,
-      strokeOpacity: attr.strokeOpacity,
+      strokeWidth: presentationAttributes.strokeWidth,
+      strokeDashArray: presentationAttributes.strokeDashArray,
+      strokeDashOffset: presentationAttributes.strokeDashOffset,
+      opacity: presentationAttributes.opacity,
+      strokeOpacity: presentationAttributes.strokeOpacity,
       mixBlendMode: mixBlendMode,
       transform: transform(props.transform),
     };
   },
 
   ellipse(props: any, _: PDFDocument): Shape {
-    const attr = hierarchy(
+    const presentationAttributes = hierarchy(
       props,
       this.internalCSS,
       props.style ? props.style : {},
     );
 
-    let { clipPath, fill, mixBlendMode } = attr;
-
-    if (clipPath) {
-      const match = /url\((.*)\)/g.exec(clipPath);
-      if (match) {
-        clipPath = this.definitions[match[1]];
-      }
-    }
-
-    if (fill) {
-      if (fill !== 'none') {
-        fill = parseColor(fill);
+    let fill: Color | undefined;
+    if (presentationAttributes.fill) {
+      if (presentationAttributes.fill !== 'none') {
+        fill = parseColor(presentationAttributes.fill);
       } else {
         fill = undefined;
       }
@@ -474,10 +485,19 @@ export const JSXParsers: {
       fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
     }
 
-    if (mixBlendMode) {
-      mixBlendMode = camel(mixBlendMode);
-      mixBlendMode =
-        mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
+    let clipPath;
+    if (presentationAttributes.clipPath) {
+      const match = /url\((.*)\)/g.exec(presentationAttributes.clipPath);
+      if (match) {
+        clipPath = this.definitions[match[1]];
+      }
+    }
+
+    let mixBlendMode;
+    if (presentationAttributes.mixBlendMode) {
+      mixBlendMode = camel(presentationAttributes.mixBlendMode);
+      mixBlendMode = (mixBlendMode.charAt(0).toUpperCase() +
+        mixBlendMode.slice(1)) as BlendMode;
     }
 
     return {
@@ -488,43 +508,36 @@ export const JSXParsers: {
         parseFloat(props.rx),
         parseFloat(props.ry),
       ),
-      clip: clipPath,
-      clipRule: attr.clipRule,
+      clipPath: clipPath,
+      clipRule: presentationAttributes.clipRule,
       fill: fill,
-      fillRule: attr.fillRule,
+      fillRule: presentationAttributes.fillRule,
       stroke:
-        attr.stroke && attr.stroke !== 'none'
-          ? parseColor(attr.stroke)
+        presentationAttributes.stroke &&
+        presentationAttributes.stroke !== 'none'
+          ? parseColor(presentationAttributes.stroke)
           : undefined,
-      strokeWidth: attr.strokeWidth,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: attr.strokeDashOffset,
-      opacity: attr.opacity,
-      strokeOpacity: attr.strokeOpacity,
+      strokeWidth: presentationAttributes.strokeWidth,
+      strokeDashArray: presentationAttributes.strokeDashArray,
+      strokeDashOffset: presentationAttributes.strokeDashOffset,
+      opacity: presentationAttributes.opacity,
+      strokeOpacity: presentationAttributes.strokeOpacity,
       mixBlendMode: mixBlendMode,
       transform: transform(props.transform),
     };
   },
 
   rect(props: any, _: PDFDocument): Shape {
-    const attr = hierarchy(
+    const presentationAttributes = hierarchy(
       props,
       this.internalCSS,
       props.style ? props.style : {},
     );
 
-    let { clipPath, fill, mixBlendMode } = attr;
-
-    if (clipPath) {
-      const match = /url\((.*)\)/g.exec(clipPath);
-      if (match) {
-        clipPath = this.definitions[match[1]];
-      }
-    }
-
-    if (fill) {
-      if (fill !== 'none') {
-        fill = parseColor(fill);
+    let fill: Color | undefined;
+    if (presentationAttributes.fill) {
+      if (presentationAttributes.fill !== 'none') {
+        fill = parseColor(presentationAttributes.fill);
       } else {
         fill = undefined;
       }
@@ -532,10 +545,19 @@ export const JSXParsers: {
       fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
     }
 
-    if (mixBlendMode) {
-      mixBlendMode = camel(mixBlendMode);
-      mixBlendMode =
-        mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
+    let clipPath;
+    if (presentationAttributes.clipPath) {
+      const match = /url\((.*)\)/g.exec(presentationAttributes.clipPath);
+      if (match) {
+        clipPath = this.definitions[match[1]];
+      }
+    }
+
+    let mixBlendMode;
+    if (presentationAttributes.mixBlendMode) {
+      mixBlendMode = camel(presentationAttributes.mixBlendMode);
+      mixBlendMode = (mixBlendMode.charAt(0).toUpperCase() +
+        mixBlendMode.slice(1)) as BlendMode;
     }
 
     return {
@@ -548,44 +570,45 @@ export const JSXParsers: {
         props.rx ? parseFloat(props.rx) : undefined,
         props.ry ? parseFloat(props.ry) : undefined,
       ),
-      clip: clipPath,
-      clipRule: attr.clipRule,
+      clipPath: clipPath,
+      clipRule: presentationAttributes.clipRule,
       fill: fill,
-      fillRule: attr.fillRule,
+      fillRule: presentationAttributes.fillRule,
       stroke:
-        attr.stroke && attr.stroke !== 'none'
-          ? parseColor(attr.stroke)
+        presentationAttributes.stroke &&
+        presentationAttributes.stroke !== 'none'
+          ? parseColor(presentationAttributes.stroke)
           : undefined,
-      strokeWidth: attr.strokeWidth,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: attr.strokeDashOffset,
-      opacity: attr.opacity,
-      strokeOpacity: attr.strokeOpacity,
+      strokeWidth: presentationAttributes.strokeWidth,
+      strokeDashArray: presentationAttributes.strokeDashArray,
+      strokeDashOffset: presentationAttributes.strokeDashOffset,
+      opacity: presentationAttributes.opacity,
+      strokeOpacity: presentationAttributes.strokeOpacity,
       mixBlendMode: mixBlendMode,
       transform: transform(props.transform),
     };
   },
 
   line(props: any, _: PDFDocument): Shape {
-    const attr = hierarchy(
+    const presentationAttributes = hierarchy(
       props,
       this.internalCSS,
       props.style ? props.style : {},
     );
 
-    let { clipPath, mixBlendMode } = attr;
-
-    if (clipPath) {
-      const match = /url\((.*)\)/g.exec(clipPath);
+    let clipPath;
+    if (presentationAttributes.clipPath) {
+      const match = /url\((.*)\)/g.exec(presentationAttributes.clipPath);
       if (match) {
         clipPath = this.definitions[match[1]];
       }
     }
 
-    if (mixBlendMode) {
-      mixBlendMode = camel(mixBlendMode);
-      mixBlendMode =
-        mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
+    let mixBlendMode;
+    if (presentationAttributes.mixBlendMode) {
+      mixBlendMode = camel(presentationAttributes.mixBlendMode);
+      mixBlendMode = (mixBlendMode.charAt(0).toUpperCase() +
+        mixBlendMode.slice(1)) as BlendMode;
     }
 
     return {
@@ -596,17 +619,18 @@ export const JSXParsers: {
         parseFloat(props.x2),
         parseFloat(props.y2),
       ),
-      clip: clipPath,
-      clipRule: attr.clipRule,
+      clipPath: clipPath,
+      clipRule: presentationAttributes.clipRule,
       stroke:
-        attr.stroke && attr.stroke !== 'none'
-          ? parseColor(attr.stroke)
+        presentationAttributes.stroke &&
+        presentationAttributes.stroke !== 'none'
+          ? parseColor(presentationAttributes.stroke)
           : undefined,
-      strokeWidth: attr.strokeWidth,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: attr.strokeDashOffset,
-      opacity: attr.opacity,
-      strokeOpacity: attr.strokeOpacity,
+      strokeWidth: presentationAttributes.strokeWidth,
+      strokeDashArray: presentationAttributes.strokeDashArray,
+      strokeDashOffset: presentationAttributes.strokeDashOffset,
+      opacity: presentationAttributes.opacity,
+      strokeOpacity: presentationAttributes.strokeOpacity,
       mixBlendMode: mixBlendMode,
       transform: transform(props.transform),
     };
@@ -614,14 +638,20 @@ export const JSXParsers: {
 
   defs(props: any, doc: PDFDocument): void {
     let children = React.Children.toArray(props.children);
-    children.forEach(({ type, props }: any) => this[type](props, doc));
+    children.forEach(({ type, props }: any) => {
+      try {
+        this[type](props, doc);
+      } catch (err) {
+        throw new Error('Unsupported or not yet supported tag, ' + type);
+      }
+    });
   },
 
   style(props: any, _: PDFDocument): void {
-    const string = props.children;
+    const innerHTML = props.dangerouslySetInnerHTML.__html;
     let regCls = /.(.*?){(.*?)}/g,
       cls;
-    while ((cls = regCls.exec(string))) {
+    while ((cls = regCls.exec(innerHTML))) {
       const names = cls[1].split(',.');
       for (const name of names) {
         const styles = cls[2];
@@ -639,55 +669,82 @@ export const JSXParsers: {
   },
 
   async image(props: any, doc: PDFDocument): Promise<Image> {
-    let { width, height, style } = props;
-    const attr = hierarchy(props, this.internalCSS, style);
+    const presentationAttributes = hierarchy(
+      props,
+      this.internalCSS,
+      props.style,
+    );
 
-    width = parseFloat(width);
-    height = parseFloat(height);
-
-    let { mixBlendMode } = attr,
-      clip;
-
-    if (attr.clipPath) {
-      const match = /url\((.*)\)/g.exec(attr.clipPath);
+    let clipPath;
+    if (presentationAttributes.clipPath) {
+      const match = /url\((.*)\)/g.exec(presentationAttributes.clipPath);
       if (match) {
-        clip = this.definitions[match[1]];
+        clipPath = this.definitions[match[1]];
       }
     }
 
-    if (mixBlendMode) {
-      mixBlendMode = camel(mixBlendMode);
-      mixBlendMode =
-        mixBlendMode.charAt(0).toUpperCase() + mixBlendMode.slice(1);
+    let mixBlendMode;
+    if (presentationAttributes.mixBlendMode) {
+      mixBlendMode = camel(presentationAttributes.mixBlendMode);
+      mixBlendMode = (mixBlendMode.charAt(0).toUpperCase() +
+        mixBlendMode.slice(1)) as BlendMode;
     }
 
-    const image = await doc.embedPng(props['xlink:href']);
+    const image = await doc.embedPng(props['href']);
     return {
       type: 'image',
       image: image,
-      width: width,
-      height: height,
-      clip: clip,
-      clipRule: attr.clipRule,
-      opacity: attr.opacity,
+      width: parseFloat(props.width),
+      height: parseFloat(props.height),
+      clipPath: clipPath,
+      clipRule: presentationAttributes.clipRule,
+      opacity: presentationAttributes.opacity,
       mixBlendMode: mixBlendMode,
       transform: transform(props.transform),
     };
   },
 
-  async clippath(props: any, doc: PDFDocument) {
-    let children = React.Children.toArray(props.children);
+  async clipPath(props: any, doc: PDFDocument): Promise<void> {
+    let children: (PDFGraphic | undefined)[] = [];
+    for (const child of React.Children.toArray(props.children)) {
+      if (
+        typeof child === 'string' ||
+        typeof child === 'number' ||
+        !('type' in child)
+      ) {
+        // TODO: figure out if these cases are applicable
+        continue;
+      }
+
+      const tagName = child.type.toString();
+      if (typeof this[tagName] === 'function') {
+        children.push(await this[tagName](child.props, doc));
+      }
+    }
+
     this.definitions['#' + props.id] = shape({
       type: 'group',
-      children: (
-        await Promise.all(
-          children.map(async ({ type, props }: any) =>
-            typeof this[type] === 'function'
-              ? await this[type](props, doc)
-              : undefined,
-          ),
-        )
-      ).filter(Boolean) as PDFGraphic[],
+      children: children.filter(Boolean) as PDFGraphic[],
     });
+  },
+
+  text(props: any, _: PDFDocument) {
+    const presentationAttributes = hierarchy(
+      props,
+      this.internalCSS,
+      props.style,
+    );
+
+    console.log(presentationAttributes);
+    // let children = React.Children.toArray(props.children);
+  },
+
+  tspan(props: any, _: PDFDocument) {
+    // const presentationAttributes = hierarchy(
+    //   props,
+    //   this.internalCSS,
+    //   props.style,
+    // );
+    if (props) return;
   },
 };

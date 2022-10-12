@@ -830,8 +830,8 @@ export const graphicToOperators = (
   }
 
   // apply clipping to graphic state
-  if (g.clip) {
-    ops.push(...g.clip, clip(g.clipRule), endPath());
+  if (g.clipPath) {
+    ops.push(...g.clipPath, clip(g.clipRule), endPath());
   }
 
   switch (g.type) {
