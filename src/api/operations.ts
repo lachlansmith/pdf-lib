@@ -382,20 +382,22 @@ export const draw = (
     scale?: number | PDFNumber;
     graphicsState?: string | PDFName;
   },
-) =>
-  [
+) => {
+  const operators: (PDFOperator | undefined)[] = [];
+  operators.push(
     pushGraphicsState(),
-
     translate(options.x, options.y),
     rotateRadians(toRadians(options.rotate ?? degrees(0))),
-    options.scale && scale(options.scale, options.scale),
-
-    // TODO: make coordinate system of draw bottom left, same as others
     scale(1, -1), // make top left
-    ...graphicToOperators(graphic, page),
+  );
 
-    popGraphicsState(),
-  ].filter(Boolean) as PDFOperator[];
+  const ops = graphicToOperators(graphic, page); // can't use spread operator or will hit max call stack
+  ops.forEach((o) => operators.push(o));
+
+  operators.push(popGraphicsState());
+
+  return operators.filter(Boolean) as PDFOperator[];
+};
 
 export const drawCheckMark = (options: {
   x: number | PDFNumber;
@@ -814,7 +816,7 @@ export const graphicToOperators = (
 
   // apply transforms to graphic state
   if (g.transform) {
-    ops.push(...g.transform);
+    g.transform.forEach((o) => ops.push(o));
   }
 
   if (g.mixBlendMode || g.opacity || g.strokeOpacity) {
@@ -831,34 +833,37 @@ export const graphicToOperators = (
 
   // apply clipping to graphic state
   if (g.clipPath) {
-    ops.push(...g.clipPath, clip(g.clipRule), endPath());
+    g.clipPath.forEach((o) => ops.push(o));
+    ops.push(clip(g.clipRule));
+    ops.push(endPath());
   }
 
   switch (g.type) {
     case 'group':
       g.children.forEach((graphic: PDFGraphic) => {
-        ops.push(...graphicToOperators(graphic, page)); // draw children
+        const operators = graphicToOperators(graphic, page);
+        operators.forEach((o) => ops.push(o));
       });
       break;
 
     case 'shape':
-      ops.push(
-        ...([
-          g.fill ? setFillingColor(g.fill) : undefined,
-          g.stroke ? setStrokingColor(g.stroke) : undefined,
-          g.strokeWidth ? setLineWidth(g.strokeWidth) : undefined,
-          g.strokeLineCap ? setLineCap(g.strokeLineCap) : undefined,
-          g.strokeDashArray || g.strokeDashOffset
-            ? setDashPattern(g.strokeDashArray ?? [], g.strokeDashOffset ?? 0)
-            : undefined,
-          ...g.operators,
-          // prettier-ignore
-          (g.fill && g.stroke) ? fillAndStroke(g.fillRule)
-        : g.fill             ? fill(g.fillRule)
-        : g.stroke           ? stroke()
-        : undefined,
-        ].filter(Boolean) as PDFOperator[]),
-      );
+      const shape = [
+        g.fill ? setFillingColor(g.fill) : undefined,
+        g.stroke ? setStrokingColor(g.stroke) : undefined,
+        g.strokeWidth ? setLineWidth(g.strokeWidth) : undefined,
+        g.strokeLineCap ? setLineCap(g.strokeLineCap) : undefined,
+        g.strokeDashArray || g.strokeDashOffset
+          ? setDashPattern(g.strokeDashArray ?? [], g.strokeDashOffset ?? 0)
+          : undefined,
+        ...g.operators,
+        // prettier-ignore
+        (g.fill && g.stroke) ? fillAndStroke(g.fillRule)
+      : g.fill             ? fill(g.fillRule)
+      : g.stroke           ? stroke()
+      : undefined,
+      ].filter(Boolean) as PDFOperator[];
+
+      shape.forEach((o) => ops.push(o));
 
       break;
 
@@ -868,13 +873,9 @@ export const graphicToOperators = (
 
     case 'image':
       const name = page.node.newXObject('Image', g.image.ref);
-      ops.push(
-        ...[
-          translate(0, g.height), // shift by height corrects flip
-          scale(g.width, -g.height), // negative (flip) corrects upside down drawing
-          drawObject(name), // draw image
-        ],
-      );
+      ops.push(translate(0, g.height)); // shift by height corrects flip
+      ops.push(scale(g.width, -g.height)); // negative (flip) corrects upside down drawing
+      ops.push(drawObject(name));
       break;
   }
 

@@ -1544,14 +1544,15 @@ export default class PDFPage {
     assertOrUndefined(options.scale, 'options.scale', ['number']);
 
     const contentStream = this.getContentStream();
-    contentStream.push(
-      ...draw(graphic, this, {
-        x: options.x || 0,
-        y: options.y || 0,
-        rotate: options.rotate || degrees(0),
-        scale: options.scale || 1,
-      }),
-    );
+
+    const operators = draw(graphic, this, {
+      x: options.x || 0,
+      y: options.y || 0,
+      rotate: options.rotate || degrees(0),
+      scale: options.scale || 1,
+    });
+
+    operators.forEach((o) => contentStream.push(o));
   }
 
   /**
