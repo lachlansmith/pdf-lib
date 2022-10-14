@@ -10,7 +10,7 @@ import PDFFont from 'src/api/PDFFont';
 import PDFImage from 'src/api/PDFImage';
 import PDFPage from 'src/api/PDFPage';
 import PDFForm from 'src/api/form/PDFForm';
-import PDFGraphic, { JSXParsers } from 'src/api/PDFGraphic';
+import PDFGraphic, { JSXParsers, PDFGraphicState } from 'src/api/PDFGraphic';
 import { PageSizes } from 'src/api/sizes';
 import { StandardFonts } from 'src/api/StandardFonts';
 import {
@@ -1235,11 +1235,17 @@ export default class PDFDocument {
 
   async parseJsx(jsx: React.ReactElement): Promise<PDFGraphic> {
     const tagName = jsx.type.toString();
-    const parser = JSXParsers[tagName];
 
-    return typeof parser === 'function'
-      ? await JSXParsers[tagName](jsx.props, this)
-      : undefined;
+    if (typeof JSXParsers[tagName] !== 'function') {
+      throw new Error(
+        'Parser for JSX ' +
+          tagName +
+          ' element not supported, or not yet supported',
+      );
+    }
+
+    const state = new PDFGraphicState();
+    return await JSXParsers[tagName](jsx.props, this, state);
   }
 
   /**

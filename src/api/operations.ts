@@ -847,7 +847,7 @@ export const graphicToOperators = (
       break;
 
     case 'shape':
-      const shape = [
+      ops.push(
         g.fill ? setFillingColor(g.fill) : undefined,
         g.stroke ? setStrokingColor(g.stroke) : undefined,
         g.strokeWidth ? setLineWidth(g.strokeWidth) : undefined,
@@ -855,15 +855,17 @@ export const graphicToOperators = (
         g.strokeDashArray || g.strokeDashOffset
           ? setDashPattern(g.strokeDashArray ?? [], g.strokeDashOffset ?? 0)
           : undefined,
-        ...g.operators,
+      );
+
+      g.operators.forEach((o) => ops.push(o));
+
+      ops.push(
         // prettier-ignore
         (g.fill && g.stroke) ? fillAndStroke(g.fillRule)
-      : g.fill             ? fill(g.fillRule)
-      : g.stroke           ? stroke()
-      : undefined,
-      ].filter(Boolean) as PDFOperator[];
-
-      shape.forEach((o) => ops.push(o));
+            : g.fill         ? fill(g.fillRule)
+            : g.stroke       ? stroke()
+            : undefined,
+      );
 
       break;
 

@@ -9,7 +9,11 @@ import { PDFOperator } from 'src/core';
 
 import ColorParser from 'color';
 
-interface Base {
+interface Iterator {
+  [key: string]: any;
+}
+
+interface Base extends Iterator {
   transform?: PDFOperator[];
   clipPath?: PDFOperator[];
   clipRule?: 'nonzero' | 'evenodd';
@@ -63,6 +67,11 @@ const camel = (string: string) =>
     return g[1].toUpperCase();
   });
 
+const removeUndefined = <T extends PDFGraphic>(obj: T): T => {
+  Object.keys(obj).forEach((key) => obj[key] === undefined && delete obj[key]);
+  return obj;
+};
+
 const hierarchy = (props: any, internalCss: any, inlineStyle: any) => {
   // construct styles classes from listed class names
   let classes = {};
@@ -92,13 +101,6 @@ const hierarchy = (props: any, internalCss: any, inlineStyle: any) => {
     ...classes,
     ...inlineStyle,
   };
-
-  // delete undefined keys
-  Object.keys(presentationAttributes).forEach(
-    (key) =>
-      presentationAttributes[key] === undefined &&
-      delete presentationAttributes[key],
-  );
 
   return presentationAttributes;
 };
@@ -146,16 +148,29 @@ const mixBlendMode = (mixBlendMode?: string): BlendMode | undefined => {
   return (blendMode.charAt(0).toUpperCase() + blendMode.slice(1)) as BlendMode;
 };
 
-export const JSXParsers: {
-  [type: string]: any | ((props: any, doc: PDFDocument) => PDFGraphic);
-} = {
-  internalCSS: {},
-  definitions: {},
+export class PDFGraphicState {
+  public internalCSS: any;
+  public defs: any;
 
-  async svg(props: any, doc: PDFDocument): Promise<Group> {
+  constructor() {
+    this.internalCSS = {};
+    this.defs = {};
+  }
+}
+
+export const JSXParsers: {
+  [type: string]:
+    | any
+    | ((props: any, doc: PDFDocument, state: PDFGraphicState) => PDFGraphic);
+} = {
+  async svg(
+    props: any,
+    doc: PDFDocument,
+    state: PDFGraphicState,
+  ): Promise<Group> {
     const presentationAttributes = hierarchy(
       props,
-      this.internalCSS,
+      state.internalCSS,
       props.style ? props.style : {},
     );
 
@@ -172,26 +187,30 @@ export const JSXParsers: {
 
       const tagName = child.type.toString();
       if (typeof this[tagName] === 'function') {
-        children.push(await this[tagName](child.props, doc));
+        children.push(await this[tagName](child.props, doc, state));
       }
     }
 
-    return {
+    return removeUndefined({
       type: 'group',
-      clipPath: clipPath(this.definitions, presentationAttributes.clipPath),
+      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
       clipRule: presentationAttributes.clipRule,
-      opacity: presentationAttributes.opacity,
-      strokeOpacity: presentationAttributes.strokeOpacity,
+      opacity: parseFloat(presentationAttributes.opacity),
+      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
       mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
       transform: transform(props.transform),
       children: children.filter(Boolean) as PDFGraphic[],
-    };
+    } as Group);
   },
 
-  async g(props: any, doc: PDFDocument): Promise<Group> {
+  async g(
+    props: any,
+    doc: PDFDocument,
+    state: PDFGraphicState,
+  ): Promise<Group> {
     const presentationAttributes = hierarchy(
       props,
-      this.internalCSS,
+      state.internalCSS,
       props.style ? props.style : {},
     );
 
@@ -208,13 +227,13 @@ export const JSXParsers: {
 
       const tagName = child.type.toString();
       if (typeof this[tagName] === 'function') {
-        children.push(await this[tagName](child.props, doc));
+        children.push(await this[tagName](child.props, doc, state));
       }
     }
 
-    return {
+    return removeUndefined({
       type: 'group',
-      clipPath: clipPath(this.definitions, presentationAttributes.clipPath),
+      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
       clipRule: presentationAttributes.clipRule,
       fill:
         presentationAttributes.fill && presentationAttributes.fill !== 'none'
@@ -229,22 +248,26 @@ export const JSXParsers: {
       strokeWidth: presentationAttributes.strokeWidth,
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: presentationAttributes.opacity,
-      strokeOpacity: presentationAttributes.strokeOpacity,
+      opacity: parseFloat(presentationAttributes.opacity),
+      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
       mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
       transform: transform(props.transform),
       children: children.filter(Boolean) as PDFGraphic[],
-    };
+    } as Group);
   },
 
-  ['Symbol(react.fragment)'](props: any, doc: PDFDocument) {
-    return this['g'](props, doc);
+  ['Symbol(react.fragment)'](
+    props: any,
+    doc: PDFDocument,
+    state: PDFGraphicState,
+  ) {
+    return this['g'](props, doc, state); // SVG 2 spec treats all non SVG elements as g
   },
 
-  path(props: any, _: PDFDocument): Shape {
+  path(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
     const presentationAttributes = hierarchy(
       props,
-      this.internalCSS,
+      state.internalCSS,
       props.style ? props.style : {},
     );
 
@@ -259,10 +282,10 @@ export const JSXParsers: {
       fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
     }
 
-    return {
+    return removeUndefined({
       type: 'shape',
       operators: path(props.d),
-      clipPath: clipPath(this.definitions, presentationAttributes.clipPath),
+      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
       clipRule: presentationAttributes.clipRule,
       fill: fill,
       fillRule: presentationAttributes.fillRule,
@@ -274,24 +297,24 @@ export const JSXParsers: {
       strokeWidth: presentationAttributes.strokeWidth,
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: presentationAttributes.opacity,
-      strokeOpacity: presentationAttributes.strokeOpacity,
+      opacity: parseFloat(presentationAttributes.opacity),
+      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
       mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
       transform: transform(props.transform),
-    };
+    } as Shape);
   },
 
-  polyline(props: any, _: PDFDocument): Shape {
+  polyline(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
     const presentationAttributes = hierarchy(
       props,
-      this.internalCSS,
+      state.internalCSS,
       props.style ? props.style : {},
     );
 
-    return {
+    return removeUndefined({
       type: 'shape',
       operators: path('M' + props.points),
-      clipPath: clipPath(this.definitions, presentationAttributes.clipPath),
+      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
       clipRule: presentationAttributes.clipRule,
       stroke:
         presentationAttributes.stroke &&
@@ -301,17 +324,17 @@ export const JSXParsers: {
       strokeWidth: presentationAttributes.strokeWidth,
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: presentationAttributes.opacity,
-      strokeOpacity: presentationAttributes.strokeOpacity,
+      opacity: parseFloat(presentationAttributes.opacity),
+      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
       mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
       transform: transform(props.transform),
-    };
+    } as Shape);
   },
 
-  polygon(props: any, _: PDFDocument): Shape {
+  polygon(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
     const presentationAttributes = hierarchy(
       props,
-      this.internalCSS,
+      state.internalCSS,
       props.style ? props.style : {},
     );
 
@@ -326,10 +349,10 @@ export const JSXParsers: {
       fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
     }
 
-    return {
+    return removeUndefined({
       type: 'shape',
       operators: path('M' + props.points + 'z'),
-      clipPath: clipPath(this.definitions, presentationAttributes.clipPath),
+      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
       clipRule: presentationAttributes.clipRule,
       fill: fill,
       fillRule: presentationAttributes.fillRule,
@@ -341,17 +364,17 @@ export const JSXParsers: {
       strokeWidth: presentationAttributes.strokeWidth,
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: presentationAttributes.opacity,
-      strokeOpacity: presentationAttributes.strokeOpacity,
+      opacity: parseFloat(presentationAttributes.opacity),
+      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
       mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
       transform: transform(props.transform),
-    };
+    } as Shape);
   },
 
-  circle(props: any, _: PDFDocument): Shape {
+  circle(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
     const presentationAttributes = hierarchy(
       props,
-      this.internalCSS,
+      state.internalCSS,
       props.style ? props.style : {},
     );
 
@@ -366,14 +389,14 @@ export const JSXParsers: {
       fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
     }
 
-    return {
+    return removeUndefined({
       type: 'shape',
       operators: circle(
         parseFloat(props.cx),
         parseFloat(props.cy),
         parseFloat(props.r),
       ),
-      clipPath: clipPath(this.definitions, presentationAttributes.clipPath),
+      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
       clipRule: presentationAttributes.clipRule,
       fill: fill,
       fillRule: presentationAttributes.fillRule,
@@ -385,17 +408,17 @@ export const JSXParsers: {
       strokeWidth: presentationAttributes.strokeWidth,
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: presentationAttributes.opacity,
-      strokeOpacity: presentationAttributes.strokeOpacity,
+      opacity: parseFloat(presentationAttributes.opacity),
+      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
       mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
       transform: transform(props.transform),
-    };
+    } as Shape);
   },
 
-  ellipse(props: any, _: PDFDocument): Shape {
+  ellipse(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
     const presentationAttributes = hierarchy(
       props,
-      this.internalCSS,
+      state.internalCSS,
       props.style ? props.style : {},
     );
 
@@ -410,7 +433,7 @@ export const JSXParsers: {
       fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
     }
 
-    return {
+    return removeUndefined({
       type: 'shape',
       operators: ellipse(
         parseFloat(props.cx),
@@ -418,7 +441,7 @@ export const JSXParsers: {
         parseFloat(props.rx),
         parseFloat(props.ry),
       ),
-      clipPath: clipPath(this.definitions, presentationAttributes.clipPath),
+      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
       clipRule: presentationAttributes.clipRule,
       fill: fill,
       fillRule: presentationAttributes.fillRule,
@@ -430,17 +453,17 @@ export const JSXParsers: {
       strokeWidth: presentationAttributes.strokeWidth,
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: presentationAttributes.opacity,
-      strokeOpacity: presentationAttributes.strokeOpacity,
+      opacity: parseFloat(presentationAttributes.opacity),
+      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
       mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
       transform: transform(props.transform),
-    };
+    } as Shape);
   },
 
-  rect(props: any, _: PDFDocument): Shape {
+  rect(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
     const presentationAttributes = hierarchy(
       props,
-      this.internalCSS,
+      state.internalCSS,
       props.style ? props.style : {},
     );
 
@@ -455,7 +478,7 @@ export const JSXParsers: {
       fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
     }
 
-    return {
+    return removeUndefined({
       type: 'shape',
       operators: rect(
         parseFloat(props.x),
@@ -465,7 +488,7 @@ export const JSXParsers: {
         props.rx ? parseFloat(props.rx) : undefined,
         props.ry ? parseFloat(props.ry) : undefined,
       ),
-      clipPath: clipPath(this.definitions, presentationAttributes.clipPath),
+      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
       clipRule: presentationAttributes.clipRule,
       fill: fill,
       fillRule: presentationAttributes.fillRule,
@@ -477,21 +500,21 @@ export const JSXParsers: {
       strokeWidth: presentationAttributes.strokeWidth,
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: presentationAttributes.opacity,
-      strokeOpacity: presentationAttributes.strokeOpacity,
+      opacity: parseFloat(presentationAttributes.opacity),
+      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
       mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
       transform: transform(props.transform),
-    };
+    } as Shape);
   },
 
-  line(props: any, _: PDFDocument): Shape {
+  line(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
     const presentationAttributes = hierarchy(
       props,
-      this.internalCSS,
+      state.internalCSS,
       props.style ? props.style : {},
     );
 
-    return {
+    return removeUndefined({
       type: 'shape',
       operators: line(
         parseFloat(props.x1),
@@ -499,7 +522,7 @@ export const JSXParsers: {
         parseFloat(props.x2),
         parseFloat(props.y2),
       ),
-      clipPath: clipPath(this.definitions, presentationAttributes.clipPath),
+      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
       clipRule: presentationAttributes.clipRule,
       stroke:
         presentationAttributes.stroke &&
@@ -509,25 +532,25 @@ export const JSXParsers: {
       strokeWidth: presentationAttributes.strokeWidth,
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: presentationAttributes.opacity,
-      strokeOpacity: presentationAttributes.strokeOpacity,
+      opacity: parseFloat(presentationAttributes.opacity),
+      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
       mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
       transform: transform(props.transform),
-    };
+    } as Shape);
   },
 
-  defs(props: any, doc: PDFDocument): void {
+  defs(props: any, doc: PDFDocument, state: PDFGraphicState): void {
     let children = React.Children.toArray(props.children);
     children.forEach(({ type, props }: any) => {
       try {
-        this[type](props, doc);
+        this[type](props, doc, state);
       } catch (err) {
         throw new Error('Unsupported or not yet supported tag, ' + type);
       }
     });
   },
 
-  style(props: any, _: PDFDocument): void {
+  style(props: any, _: PDFDocument, state: PDFGraphicState): void {
     const innerHTML = props.dangerouslySetInnerHTML.__html;
     let regCls = /.(.*?){(.*?)}/g,
       cls;
@@ -536,40 +559,94 @@ export const JSXParsers: {
       for (const name of names) {
         const styles = cls[2];
 
-        if (!(name in this.internalCSS)) {
-          this.internalCSS[name] = {};
+        if (!(name in state.internalCSS)) {
+          state.internalCSS[name] = {};
         }
 
         styles.split(';').map((style) => {
           const [key, value] = style.split(':');
-          this.internalCSS[name][camel(key)] = value;
+          state.internalCSS[name][camel(key)] = value;
         });
       }
     }
   },
 
-  async image(props: any, doc: PDFDocument): Promise<Image> {
+  async image(
+    props: any,
+    doc: PDFDocument,
+    state: PDFGraphicState,
+  ): Promise<Image> {
     const presentationAttributes = hierarchy(
       props,
-      this.internalCSS,
+      state.internalCSS,
       props.style,
     );
 
-    const image = await doc.embedPng(props['href']);
-    return {
-      type: 'image',
-      image: image,
-      width: parseFloat(props.width),
-      height: parseFloat(props.height),
-      clipPath: clipPath(this.definitions, presentationAttributes.clipPath),
-      clipRule: presentationAttributes.clipRule,
-      opacity: presentationAttributes.opacity,
-      mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
-      transform: transform(props.transform),
-    };
+    if (props['xlink:href']) {
+      props.href = props['xlink:href']; // shouldn't be using this anyway so should be okay with performance hit
+    }
+
+    const mimeType = props.href.substring(
+      props.href.indexOf(':') + 1,
+      props.href.indexOf(';'),
+    );
+
+    switch (mimeType) {
+      case 'image/png':
+        const png = await doc.embedPng(props.href);
+        return removeUndefined({
+          type: 'image',
+          image: png,
+          width: parseFloat(props.width),
+          height: parseFloat(props.height),
+          clipPath: clipPath(state.defs, presentationAttributes.clipPath),
+          clipRule: presentationAttributes.clipRule,
+          opacity: parseFloat(presentationAttributes.opacity),
+          mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
+          transform: transform(props.transform),
+        } as Image);
+
+      case 'image/jpg':
+      case 'image/jpeg':
+        const jpeg = await doc.embedJpg(props.href);
+        return removeUndefined({
+          type: 'image',
+          image: jpeg,
+          width: parseFloat(props.width),
+          height: parseFloat(props.height),
+          clipPath: clipPath(state.defs, presentationAttributes.clipPath),
+          clipRule: presentationAttributes.clipRule,
+          opacity: parseFloat(presentationAttributes.opacity),
+          mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
+          transform: transform(props.transform),
+        } as Image);
+
+      //   case 'image/svg+xml':
+      //     const jsx = HtmlReactParser(
+      //       Buffer.from(props.href.split(';base64,')[1], 'base64').toString(), // base64 encoding to svg string
+      //       {
+      //         htmlparser2: {
+      //           lowerCaseTags: false,
+      //         },
+      //       },
+      //     );
+
+      //     return await doc.parseJsx(jsx);
+
+      default:
+        throw new TypeError(
+          'Unsupported data type, ' +
+            mimeType +
+            ', on href of image tag\n - image/png\n - image/jpeg\n - image/jpg\n',
+        );
+    }
   },
 
-  async clipPath(props: any, doc: PDFDocument): Promise<void> {
+  async clipPath(
+    props: any,
+    doc: PDFDocument,
+    state: PDFGraphicState,
+  ): Promise<void> {
     let children: (PDFGraphic | undefined)[] = [];
     for (const child of React.Children.toArray(props.children)) {
       if (
@@ -583,31 +660,32 @@ export const JSXParsers: {
 
       const tagName = child.type.toString();
       if (typeof this[tagName] === 'function') {
-        children.push(await this[tagName](child.props, doc));
+        children.push(await this[tagName](child.props, doc, state));
       }
     }
 
-    this.definitions['#' + props.id] = shape({
+    state.defs['#' + props.id] = shape({
       type: 'group',
       children: children.filter(Boolean) as PDFGraphic[],
     });
   },
 
-  text(props: any, _: PDFDocument) {
+  text(props: any, _: PDFDocument, state: PDFGraphicState): Text {
     const presentationAttributes = hierarchy(
       props,
-      this.internalCSS,
+      state.internalCSS,
       props.style,
     );
 
     console.log(presentationAttributes);
     // let children = React.Children.toArray(props.children);
+    return removeUndefined({ type: 'text', value: '' } as Text);
   },
 
-  tspan(props: any, _: PDFDocument) {
+  tspan(props: any, _: PDFDocument, __: PDFGraphicState) {
     // const presentationAttributes = hierarchy(
     //   props,
-    //   this.internalCSS,
+    //   state.internalCSS,
     //   props.style,
     // );
     if (props) return;
