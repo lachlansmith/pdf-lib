@@ -55,7 +55,7 @@ export interface DrawTextOptions {
 }
 
 export const drawText = (
-  line: PDFHexString,
+  text: PDFHexString,
   options: DrawTextOptions,
 ): PDFOperator[] =>
   [
@@ -71,7 +71,7 @@ export const drawText = (
       options.x,
       options.y,
     ),
-    showText(line),
+    showText(text),
     endText(),
     popGraphicsState(),
   ].filter(Boolean) as PDFOperator[];
@@ -214,8 +214,8 @@ export const drawRect = (options: {
   strokeDashArray?: (number | PDFNumber)[];
   strokeDashPhase?: number | PDFNumber;
   graphicsState?: string | PDFName;
-}) => {
-  return [
+}) =>
+  [
     pushGraphicsState(),
     options.graphicsState && setGraphicsState(options.graphicsState),
 
@@ -246,7 +246,6 @@ export const drawRect = (options: {
 
     popGraphicsState(),
   ].filter(Boolean) as PDFOperator[];
-};
 
 export const drawEllipse = (options: {
   cx: number | PDFNumber;
@@ -764,13 +763,13 @@ export const drawOptionList = (options: {
 
   const highlights: PDFOperator[] = [];
   for (let idx = 0, len = options.selectedLines.length; idx < len; idx++) {
-    const line = options.textLines[options.selectedLines[idx]];
+    const text = options.textLines[options.selectedLines[idx]];
     highlights.push(
       ...drawRect({
-        x: line.x - padding,
-        y: line.y - (lineHeight - line.height) / 2,
+        x: text.x - padding,
+        y: text.y - (lineHeight - text.height) / 2,
         width: width - borderWidth,
-        height: line.height + (lineHeight - line.height) / 2,
+        height: text.height + (lineHeight - text.height) / 2,
         strokeWidth: 0,
         fill: options.selectedColor,
         stroke: undefined,
@@ -809,7 +808,7 @@ export const graphicToOperators = (
   g: PDFGraphic,
   page: PDFPage,
 ): PDFOperator[] => {
-  let ops: (PDFOperator | undefined)[] = [];
+  const ops: (PDFOperator | undefined)[] = [];
 
   // push a new graphic state that only applies to this graphic (and children)
   ops.push(pushGraphicsState());

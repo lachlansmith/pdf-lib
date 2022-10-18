@@ -47,15 +47,15 @@ export const skewX = (skx: number | PDFNumber) =>
 export const skewY = (sky: number | PDFNumber) =>
   concatTransformationMatrix(1, 0, Math.tan(asNumber(sky)), 1, 0, 0);
 
-export const transform = (string?: string): PDFOperator[] | undefined => {
-  if (!string) return;
+export const transform = (str?: string): PDFOperator[] | undefined => {
+  if (!str) return;
   const ops: (PDFOperator | undefined)[] = [];
 
-  string = string.split(' ').join(',');
+  str = str.split(' ').join(',');
 
-  let regex = /((.*?)\((.*?)\))/g,
-    match;
-  while ((match = regex.exec(string))) {
+  const regex = /((.*?)\((.*?)\))/g;
+  let match;
+  while ((match = regex.exec(str))) {
     const type = match[2].split(',').join('');
     const args = match[3].split(',').map((arg) => parseFloat(arg));
 
@@ -65,12 +65,12 @@ export const transform = (string?: string): PDFOperator[] | undefined => {
         break;
 
       case 'translate':
-        if (args.length == 1) {
+        if (args.length === 1) {
           ops.push(translate(args[0], 0));
           break;
         }
 
-        if (args.length == 2) {
+        if (args.length === 2) {
           ops.push(translate(args[0], args[1]));
           break;
         }
@@ -85,12 +85,12 @@ export const transform = (string?: string): PDFOperator[] | undefined => {
         break;
 
       case 'rotate':
-        if (args.length == 1) {
+        if (args.length === 1) {
           ops.push(rotate(args[0]));
           break;
         }
 
-        if (args.length == 3) {
+        if (args.length === 3) {
           ops.push(
             ...[
               translate(args[1], args[2]),
@@ -104,12 +104,12 @@ export const transform = (string?: string): PDFOperator[] | undefined => {
         break;
 
       case 'scale':
-        if (args.length == 1) {
+        if (args.length === 1) {
           ops.push(scale(args[0], args[0]));
           break;
         }
 
-        if (args.length == 2) {
+        if (args.length === 2) {
           ops.push(scale(args[0], args[1]));
           break;
         }

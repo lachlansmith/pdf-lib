@@ -49,7 +49,7 @@ interface Cmd {
   args: number[];
 }
 
-const parse = (path: string) => {
+const parse = (cmds: string) => {
   let cmd;
   const ret: Cmd[] = [];
   let args: number[] = [];
@@ -57,7 +57,7 @@ const parse = (path: string) => {
   let foundDecimal = false;
   let params = 0;
 
-  for (const c of path) {
+  for (const c of cmds) {
     if (parameters.has(c)) {
       params = parameters.get(c)!;
       if (cmd) {
@@ -488,7 +488,7 @@ const segmentToBezier = (
   return result;
 };
 
-export const path = (path: string) => apply(parse(path));
+export const path = (d: string) => apply(parse(d));
 
 export const rect = (
   x: number,
@@ -503,7 +503,7 @@ export const rect = (
   const W = width;
   const H = height;
   const RX = rx ?? 0;
-  if (ry) console.log(ry);
+  if (ry) ry = rx;
   //   let RY = options.ry ?? 0;
   //   if (RX && !options.ry) {
   //     RY = RX;
@@ -536,8 +536,8 @@ export const arc = (options: {
   sweep: number;
   ex: number;
   ey: number;
-}) => {
-  return [
+}) =>
+  [
     moveTo(options.x, options.y),
     ...solveArc(options.x, options.y, [
       options.rx,
@@ -550,14 +550,13 @@ export const arc = (options: {
     ]),
     closePath(),
   ].filter(Boolean) as PDFOperator[];
-};
 
-export const ellipse = (cx: number, cy: number, rx: number, ry: number) =>
+export const ellipse = (x: number, y: number, rx: number, ry: number) =>
   arc({
-    x: cx,
-    y: cy - ry,
-    rx: rx,
-    ry: ry,
+    x,
+    y: y - ry,
+    rx,
+    ry,
     rot: 0,
     large: 1,
     sweep: 0,
@@ -565,10 +564,10 @@ export const ellipse = (cx: number, cy: number, rx: number, ry: number) =>
     ey: 0,
   });
 
-export const circle = (cx: number, cy: number, r: number) =>
+export const circle = (x: number, y: number, r: number) =>
   arc({
-    x: cx,
-    y: cy - r,
+    x,
+    y: y - r,
     rx: r,
     ry: r,
     rot: 0,
@@ -597,7 +596,7 @@ export const shape = (s: Shape | Group): PDFOperator[] => {
       ops.push(...s.operators);
       break;
     default:
-      throw 'Graphic is not a shape';
+      throw new Error('Graphic is not a shape');
   }
   return ops.filter(Boolean) as PDFOperator[];
 };

@@ -62,10 +62,8 @@ type PDFGraphic = Shape | Text | Image | Group;
 
 export default PDFGraphic;
 
-const camel = (string: string) =>
-  string.replace(/-([a-z])/g, (g) => {
-    return g[1].toUpperCase();
-  });
+const camel = (str: string) =>
+  str.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
 
 const removeUndefined = <T extends PDFGraphic>(obj: T): T => {
   Object.keys(obj).forEach((key) => obj[key] === undefined && delete obj[key]);
@@ -105,11 +103,11 @@ const hierarchy = (props: any, internalCss: any, inlineStyle: any) => {
   return presentationAttributes;
 };
 
-const color = (string?: string, type?: 'RGB' | 'CMYK'): Color | undefined => {
-  if (!string) return;
+const color = (str?: string, type?: 'RGB' | 'CMYK'): Color | undefined => {
+  if (!str) return;
   switch (type) {
     case 'CMYK':
-      const { c, m, y, k } = ColorParser(string).cmyk().object();
+      const { c, m, y, k } = ColorParser(str).cmyk().object();
       return {
         type: ColorTypes.CMYK,
         cyan: c / 255,
@@ -120,7 +118,7 @@ const color = (string?: string, type?: 'RGB' | 'CMYK'): Color | undefined => {
 
     case 'RGB':
     default:
-      const { r, g, b } = ColorParser(string).rgb().object();
+      const { r, g, b } = ColorParser(str).rgb().object();
       return {
         type: ColorTypes.RGB,
         red: r / 255,
@@ -130,11 +128,14 @@ const color = (string?: string, type?: 'RGB' | 'CMYK'): Color | undefined => {
   }
 };
 
-const clipPath = (defs: any, clipPath?: string): PDFOperator[] | undefined => {
-  if (!clipPath) return;
+const clipPath = (
+  defs: any,
+  clipString?: string,
+): PDFOperator[] | undefined => {
+  if (!clipString) return;
 
   let clip: PDFOperator[] = [];
-  const match = /url\((.*)\)/g.exec(clipPath);
+  const match = /url\((.*)\)/g.exec(clipString);
   if (match) {
     clip = defs[match[1]] as PDFOperator[];
   }
@@ -142,15 +143,15 @@ const clipPath = (defs: any, clipPath?: string): PDFOperator[] | undefined => {
   return clip;
 };
 
-const mixBlendMode = (mixBlendMode?: string): BlendMode | undefined => {
-  if (!mixBlendMode) return;
-  const blendMode = camel(mixBlendMode);
+const mixBlendMode = (blendmode?: string): BlendMode | undefined => {
+  if (!blendmode) return;
+  const blendMode = camel(blendmode);
   return (blendMode.charAt(0).toUpperCase() + blendMode.slice(1)) as BlendMode;
 };
 
 export class PDFGraphicState {
-  public internalCSS: any;
-  public defs: any;
+  internalCSS: any;
+  defs: any;
 
   constructor() {
     this.internalCSS = {};
@@ -174,7 +175,7 @@ export const JSXParsers: {
       props.style ? props.style : {},
     );
 
-    let children: (PDFGraphic | undefined)[] = [];
+    const children: (PDFGraphic | undefined)[] = [];
     for (const child of React.Children.toArray(props.children)) {
       if (
         typeof child === 'string' ||
@@ -214,7 +215,7 @@ export const JSXParsers: {
       props.style ? props.style : {},
     );
 
-    let children: (PDFGraphic | undefined)[] = [];
+    const children: (PDFGraphic | undefined)[] = [];
     for (const child of React.Children.toArray(props.children)) {
       if (
         typeof child === 'string' ||
@@ -261,7 +262,7 @@ export const JSXParsers: {
     doc: PDFDocument,
     state: PDFGraphicState,
   ) {
-    return this['g'](props, doc, state); // SVG 2 spec treats all non SVG elements as g
+    return this.g(props, doc, state); // SVG 2 spec treats all non SVG elements as g
   },
 
   path(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
@@ -287,7 +288,7 @@ export const JSXParsers: {
       operators: path(props.d),
       clipPath: clipPath(state.defs, presentationAttributes.clipPath),
       clipRule: presentationAttributes.clipRule,
-      fill: fill,
+      fill,
       fillRule: presentationAttributes.fillRule,
       stroke:
         presentationAttributes.stroke &&
@@ -354,7 +355,7 @@ export const JSXParsers: {
       operators: path('M' + props.points + 'z'),
       clipPath: clipPath(state.defs, presentationAttributes.clipPath),
       clipRule: presentationAttributes.clipRule,
-      fill: fill,
+      fill,
       fillRule: presentationAttributes.fillRule,
       stroke:
         presentationAttributes.stroke &&
@@ -398,7 +399,7 @@ export const JSXParsers: {
       ),
       clipPath: clipPath(state.defs, presentationAttributes.clipPath),
       clipRule: presentationAttributes.clipRule,
-      fill: fill,
+      fill,
       fillRule: presentationAttributes.fillRule,
       stroke:
         presentationAttributes.stroke &&
@@ -443,7 +444,7 @@ export const JSXParsers: {
       ),
       clipPath: clipPath(state.defs, presentationAttributes.clipPath),
       clipRule: presentationAttributes.clipRule,
-      fill: fill,
+      fill,
       fillRule: presentationAttributes.fillRule,
       stroke:
         presentationAttributes.stroke &&
@@ -490,7 +491,7 @@ export const JSXParsers: {
       ),
       clipPath: clipPath(state.defs, presentationAttributes.clipPath),
       clipRule: presentationAttributes.clipRule,
-      fill: fill,
+      fill,
       fillRule: presentationAttributes.fillRule,
       stroke:
         presentationAttributes.stroke &&
@@ -540,20 +541,20 @@ export const JSXParsers: {
   },
 
   defs(props: any, doc: PDFDocument, state: PDFGraphicState): void {
-    let children = React.Children.toArray(props.children);
-    children.forEach(({ type, props }: any) => {
+    const children = React.Children.toArray(props.children);
+    children.forEach((child: any) => {
       try {
-        this[type](props, doc, state);
+        this[child.type](child.props, doc, state);
       } catch (err) {
-        throw new Error('Unsupported or not yet supported tag, ' + type);
+        throw new Error('Unsupported or not yet supported tag, ' + child.type);
       }
     });
   },
 
   style(props: any, _: PDFDocument, state: PDFGraphicState): void {
     const innerHTML = props.dangerouslySetInnerHTML.__html;
-    let regCls = /.(.*?){(.*?)}/g,
-      cls;
+    const regCls = /.(.*?){(.*?)}/g;
+    let cls;
     while ((cls = regCls.exec(innerHTML))) {
       const names = cls[1].split(',.');
       for (const name of names) {
@@ -647,7 +648,7 @@ export const JSXParsers: {
     doc: PDFDocument,
     state: PDFGraphicState,
   ): Promise<void> {
-    let children: (PDFGraphic | undefined)[] = [];
+    const children: (PDFGraphic | undefined)[] = [];
     for (const child of React.Children.toArray(props.children)) {
       if (
         typeof child === 'string' ||
