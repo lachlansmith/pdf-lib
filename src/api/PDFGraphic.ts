@@ -166,6 +166,12 @@ const color = (
   }
 };
 
+/**
+ *
+ * @param defs
+ * @param clipString
+ * @returns
+ */
 const clipPath = (
   defs: any,
   clipString?: string,
@@ -181,6 +187,11 @@ const clipPath = (
   return clip;
 };
 
+/**
+ *
+ * @param blendmode
+ * @returns
+ */
 const mixBlendMode = (blendmode?: string): BlendMode | undefined => {
   if (!blendmode) return;
   const blendMode = camel(blendmode);
@@ -201,9 +212,11 @@ export class PDFGraphicState {
  * DO NOT DESTRUCTURE AND AVOID DECLARING NEW VARIABLES AS YOU'LL SLOW THINGS DOWN
  */
 export const JSXParsers: {
-  [type: string]:
-    | any
-    | ((props: any, doc: PDFDocument, state: PDFGraphicState) => PDFGraphic);
+  [type: string]: (
+    props: any,
+    doc: PDFDocument,
+    state: PDFGraphicState,
+  ) => Promise<PDFGraphic> | PDFGraphic | Promise<void> | void;
 } = {
   async svg(
     props: any,
@@ -229,7 +242,9 @@ export const JSXParsers: {
 
       const tagName = child.type.toString();
       if (typeof this[tagName] === 'function') {
-        children.push(await this[tagName](child.props, doc, state));
+        children.push(
+          (await this[tagName](child.props, doc, state)) as PDFGraphic,
+        );
       }
     }
 
@@ -269,7 +284,9 @@ export const JSXParsers: {
 
       const tagName = child.type.toString();
       if (typeof this[tagName] === 'function') {
-        children.push(await this[tagName](child.props, doc, state));
+        children.push(
+          (await this[tagName](child.props, doc, state)) as PDFGraphic,
+        );
       }
     }
 
@@ -734,7 +751,9 @@ export const JSXParsers: {
 
       const tagName = child.type.toString();
       if (typeof this[tagName] === 'function') {
-        children.push(await this[tagName](child.props, doc, state));
+        children.push(
+          (await this[tagName](child.props, doc, state)) as PDFGraphic,
+        );
       }
     }
 

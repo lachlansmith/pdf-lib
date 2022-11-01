@@ -1245,7 +1245,7 @@ export default class PDFDocument {
     }
 
     const state = new PDFGraphicState();
-    return await JSXParsers[tagName](jsx.props, this, state);
+    return (await JSXParsers[tagName](jsx.props, this, state)) as PDFGraphic;
   }
 
   /**
