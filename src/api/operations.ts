@@ -382,6 +382,8 @@ export const draw = (
     rotate?: Rotation;
     scale?: number | PDFNumber;
     graphicsState?: string | PDFName;
+    clipPath?: PDFOperator[];
+    clipRule?: 'nonezero' | 'evenodd';
   },
 ) => {
   const operators: (PDFOperator | undefined)[] = [];
@@ -391,6 +393,12 @@ export const draw = (
     rotateRadians(toRadians(options.rotate ?? degrees(0))),
     scale(1, -1), // make top left
   );
+
+  if (options.clipPath) {
+    options.clipPath.forEach((c) => operators.push(c));
+    operators.push(clip(options.clipRule ? 'nonzero' : undefined));
+    operators.push(endPath());
+  }
 
   const ops = graphicToOperators(graphic, page); // can't use spread operator or will hit max call stack
   ops.forEach((o) => operators.push(o));
