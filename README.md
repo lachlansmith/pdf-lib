@@ -50,6 +50,7 @@
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [Features](#features)
 - [Motivation](#motivation)
 - [Usage Examples](#usage-examples)
@@ -67,22 +68,33 @@
   - [Read Document Metadata](#read-document-metadata)
   - [Set Viewer Preferences](#set-viewer-preferences)
   - [Read Viewer Preferences](#read-viewer-preferences)
-  - [Draw SVG Paths](#draw-svg-paths)
+  - [Draw Path](#draw-path)
+  - [Draw SVG](#draw-svg)
 - [Deno Usage](#deno-usage)
+  - [Creating a Document with Deno](#creating-a-document-with-deno)
+  - [Embedding a Font with Deno](#embedding-a-font-with-deno)
 - [Complete Examples](#complete-examples)
 - [Installation](#installation)
+  - [NPM Module](#npm-module)
+  - [UMD Module](#umd-module)
+- [Fontkit Installation](#fontkit-installation)
+  - [Fontkit NPM Module](#fontkit-npm-module)
+  - [Fontkit UMD Module](#fontkit-umd-module)
 - [Documentation](#documentation)
 - [Fonts and Unicode](#fonts-and-unicode)
+  - [Font Subsetting](#font-subsetting)
 - [Creating and Filling Forms](#creating-and-filling-forms)
+  - [Handy Methods for Filling, Creating, and Reading Form Fields](#handy-methods-for-filling-creating-and-reading-form-fields)
 - [Limitations](#limitations)
 - [Help and Discussion](#help-and-discussion)
 - [Encryption Handling](#encryption-handling)
-- [Migrating to v1.0.0](docs/MIGRATION.md)
 - [Contributing](#contributing)
 - [Maintainership](#maintainership)
 - [Tutorials and Cool Stuff](#tutorials-and-cool-stuff)
 - [Prior Art](#prior-art)
 - [Git History Rewrite](#git-history-rewrite)
+  - [Steps We Took](#steps-we-took)
+  - [Why Should I Care?](#why-should-i-care)
 - [License](#license)
 
 ## Features
@@ -958,7 +970,7 @@ PrintPageRange: [ { start: 1, end: 1 }, { start: 3, end: 4 } ]
 NumCopies: 2
 ```
 
-### Draw SVG Paths
+### Draw Path
 
 _This example produces [this PDF](assets/pdfs/examples/draw_svg_paths.pdf)_.
 
@@ -969,7 +981,7 @@ _This example produces [this PDF](assets/pdfs/examples/draw_svg_paths.pdf)_.
 import { PDFDocument, rgb } from 'pdf-lib'
 
 // SVG path for a wavy line
-const svgPath =
+const d =
   'M 0,20 L 100,160 Q 130,200 150,120 C 190,-40 200,200 300,150 L 400,90'
 
 // Create a new PDFDocument
@@ -981,19 +993,80 @@ page.moveTo(100, page.getHeight() - 5)
 
 // Draw the SVG path as a black line
 page.moveDown(25)
-page.drawSvgPath(svgPath)
+page.drawPath({d: d})
 
 // Draw the SVG path as a thick green line
 page.moveDown(200)
-page.drawSvgPath(svgPath, { borderColor: rgb(0, 1, 0), borderWidth: 5 })
+page.drawSvgPath({ d: d, borderColor: rgb(0, 1, 0), borderWidth: 5 })
 
 // Draw the SVG path and fill it with red
 page.moveDown(200)
-page.drawSvgPath(svgPath, { color: rgb(1, 0, 0) })
+page.drawSvgPath({ d: d, color: rgb(1, 0, 0) })
 
 // Draw the SVG path at 50% of its original size
 page.moveDown(200)
-page.drawSvgPath(svgPath, { scale: 0.5 })
+page.drawSvgPath({ d: d, scale: 0.5 })
+
+// Serialize the PDFDocument to bytes (a Uint8Array)
+const pdfBytes = await pdfDoc.save()
+
+// For example, `pdfBytes` can be:
+//   • Written to a file in Node
+//   • Downloaded from the browser
+//   • Rendered in an <iframe>
+```
+
+### Draw SVG
+
+_This example produces [this PDF](assets/pdfs/examples/draw_svg_paths.pdf)_.
+
+[Try the JSFiddle demo](https://jsfiddle.net/Hopding/bwaomr9h/2/)
+
+<!-- prettier-ignore -->
+```js
+import { PDFDocument, rgb } from 'pdf-lib'
+import HtmlReactParser from 'html-react-parser'
+
+// SVG path for a wavy line
+const svg =
+    '<svg width="400" height="180"> \
+        <rect x="50" y="20" width="150" height="150" style="fill:blue;stroke:pink;stroke-width:5;fill-opacity:0.1;stroke-opacity:0.9" /> \
+    </svg>'
+
+// Create a new PDFDocument
+const pdfDoc = await PDFDocument.create()
+
+const jsx = HtmlReactParser(
+    svg,
+    {
+        htmlparser2: {
+            lowerCaseTags: false,
+        },
+    },
+); // convert the svg string to valid JSX
+
+const graphic = await doc.parseJsx(jsx);
+
+const page = pdfDoc.addPage()
+
+const height = page.getHeight()
+page.moveTo(0, height)  // SVG coordinate space is from top left opposed to PDFs bottom left
+
+page.draw(graphic)
+
+const element =
+    <svg height="80" width="300">
+        <g fill="none" stroke="black" stroke-width="4">
+            <path stroke-dasharray="5,5" d="M5 20 l215 0" />
+            <path stroke-dasharray="10,10" d="M5 40 l215 0" />
+            <path stroke-dasharray="20,10,5,5,5,10" d="M5 60 l215 0" />
+        </g>
+    </svg>
+
+const graphic2 = await doc.parseJsx(jsx);
+
+page.moveTo(0, height - 250)
+page.draw(graphic, { clipPath: rect({ x: 0, y: 0, width: 80, height: 300 }), clipRule: 'nonzero' })
 
 // Serialize the PDFDocument to bytes (a Uint8Array)
 const pdfBytes = await pdfDoc.save()
