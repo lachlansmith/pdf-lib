@@ -1,4 +1,4 @@
-import { LineCapStyle } from 'src/api/operators';
+import { LineCapStyle, LineJoinStyle } from 'src/api/operators';
 import { PDFImage, BlendMode } from 'src/api';
 import React from 'react';
 import PDFDocument from './PDFDocument';
@@ -29,6 +29,8 @@ export interface Shape extends Base {
   fillRule?: 'nonzero' | 'evenodd';
   stroke?: Color;
   strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
   strokeDashArray?: number[];
   strokeDashOffset?: number;
   strokeLineCap?: LineCapStyle;
@@ -52,6 +54,8 @@ export interface Group extends Base {
   fillRule?: 'nonzero' | 'evenodd';
   stroke?: Color;
   strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
   strokeDashArray?: number[];
   strokeDashOffset?: number;
   strokeLineCap?: LineCapStyle;
@@ -91,6 +95,8 @@ const hierarchy = (props: any, internalCss: any, inlineStyle: any) => {
       fileRule: props.fileRule,
       stroke: props.stroke,
       strokeWidth: props.strokeWidth,
+      strokeLineJoin: props.strokeLineJoin,
+      strokeMiterLimit: props.strokeMiterLimit,
       strokeDashArray: props.strokeDashArray,
       strokeDashOffset: props.strokeDashOffset,
       strokeOpacity: props.strokeOpacity,
@@ -247,6 +253,8 @@ export const JSXParsers: {
           ? color(presentationAttributes.stroke)
           : undefined,
       strokeWidth: presentationAttributes.strokeWidth,
+      strokeLineJoin: presentationAttributes.strokeLineJoin,
+      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
       opacity: parseFloat(presentationAttributes.opacity),
@@ -296,6 +304,8 @@ export const JSXParsers: {
           ? color(presentationAttributes.stroke)
           : undefined,
       strokeWidth: presentationAttributes.strokeWidth,
+      strokeLineJoin: presentationAttributes.strokeLineJoin,
+      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
       opacity: parseFloat(presentationAttributes.opacity),
@@ -323,6 +333,8 @@ export const JSXParsers: {
           ? color(presentationAttributes.stroke)
           : undefined,
       strokeWidth: presentationAttributes.strokeWidth,
+      strokeLineJoin: presentationAttributes.strokeLineJoin,
+      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
       opacity: parseFloat(presentationAttributes.opacity),
@@ -363,6 +375,8 @@ export const JSXParsers: {
           ? color(presentationAttributes.stroke)
           : undefined,
       strokeWidth: presentationAttributes.strokeWidth,
+      strokeLineJoin: presentationAttributes.strokeLineJoin,
+      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
       opacity: parseFloat(presentationAttributes.opacity),
@@ -407,6 +421,8 @@ export const JSXParsers: {
           ? color(presentationAttributes.stroke)
           : undefined,
       strokeWidth: presentationAttributes.strokeWidth,
+      strokeLineJoin: presentationAttributes.strokeLineJoin,
+      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
       opacity: parseFloat(presentationAttributes.opacity),
@@ -452,6 +468,8 @@ export const JSXParsers: {
           ? color(presentationAttributes.stroke)
           : undefined,
       strokeWidth: presentationAttributes.strokeWidth,
+      strokeLineJoin: presentationAttributes.strokeLineJoin,
+      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
       opacity: parseFloat(presentationAttributes.opacity),
@@ -499,6 +517,8 @@ export const JSXParsers: {
           ? color(presentationAttributes.stroke)
           : undefined,
       strokeWidth: presentationAttributes.strokeWidth,
+      strokeLineJoin: presentationAttributes.strokeLineJoin,
+      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
       opacity: parseFloat(presentationAttributes.opacity),
@@ -531,6 +551,8 @@ export const JSXParsers: {
           ? color(presentationAttributes.stroke)
           : undefined,
       strokeWidth: presentationAttributes.strokeWidth,
+      strokeLineJoin: presentationAttributes.strokeLineJoin,
+      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
       strokeDashArray: presentationAttributes.strokeDashArray,
       strokeDashOffset: presentationAttributes.strokeDashOffset,
       opacity: parseFloat(presentationAttributes.opacity),
@@ -621,6 +643,13 @@ export const JSXParsers: {
           mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
           transform: transform(props.transform),
         } as Image);
+
+      /**
+       *
+       * Image svg support may be added if both a means to pass the data uri to a string and then to valid jsx is added to dependencies
+       *
+       * This is not something willing todo at this time, but it would look like below
+       */
 
       //   case 'image/svg+xml':
       //     const jsx = HtmlReactParser(

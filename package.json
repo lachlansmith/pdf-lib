@@ -92,6 +92,7 @@
   "dependencies": {
     "@pdf-lib/standard-fonts": "^1.0.0",
     "@pdf-lib/upng": "^1.0.1",
+    "@types/react": "^18.0.21",
     "color": "^4.2.3",
     "pako": "^1.0.11",
     "react": "16",
@@ -107,7 +108,6 @@
     "@types/jest": "^26.0.0",
     "@types/node-fetch": "^2.5.7",
     "@types/pako": "^1.0.1",
-    "@types/react-html-parser": "^2.0.2",
     "@zerollup/ts-transform-paths": "^1.7.18",
     "downlevel-dts": "^0.5.0",
     "flamebearer": "^1.1.3",

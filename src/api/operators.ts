@@ -103,6 +103,9 @@ export enum LineJoinStyle {
 export const setLineJoin = (style: LineJoinStyle) =>
   PDFOperator.of(Ops.SetLineJoinStyle, [asPDFNumber(style)]);
 
+export const setLineMiterLimit = (limit: number | PDFNumber) =>
+  PDFOperator.of(Ops.SetLineMiterLimit, [asPDFNumber(limit)]);
+
 export const setGraphicsState = (state: string | PDFName) =>
   PDFOperator.of(Ops.SetGraphicsStateParams, [asPDFName(state)]);
 

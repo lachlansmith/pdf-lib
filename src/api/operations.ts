@@ -15,6 +15,8 @@ import {
   setFontAndSize,
   setLineHeight,
   setLineWidth,
+  setLineJoin,
+  setLineMiterLimit,
   showText,
   skewRadians,
   stroke,
@@ -813,11 +815,12 @@ export const graphicToOperators = (
   // push a new graphic state that only applies to this graphic (and children)
   ops.push(pushGraphicsState());
 
-  // apply transforms to graphic state
+  // maybe apply transforms to graphic state
   if (g.transform) {
-    g.transform.forEach((o) => ops.push(o));
+    g.transform.forEach((t) => ops.push(t));
   }
 
+  // maybe apply mix blend mode and opacity to graphic state
   if (g.mixBlendMode || g.opacity || g.strokeOpacity) {
     const graphicsState = page.doc.context.obj({
       Type: 'ExtGState',
@@ -830,13 +833,14 @@ export const graphicToOperators = (
     ops.push(setGraphicsState(GState));
   }
 
-  // apply clipping to graphic state
+  // maybe apply clipping to graphic state
   if (g.clipPath) {
     g.clipPath.forEach((o) => ops.push(o));
     ops.push(clip(g.clipRule));
     ops.push(endPath());
   }
 
+  // draw shape, text or image to graphic state, or continue from groups child graphics
   switch (g.type) {
     case 'group':
       g.children.forEach((graphic: PDFGraphic) => {
@@ -846,18 +850,23 @@ export const graphicToOperators = (
       break;
 
     case 'shape':
+      // apply all presentation attributes and later stripped those undefined
       ops.push(
         g.fill ? setFillingColor(g.fill) : undefined,
         g.stroke ? setStrokingColor(g.stroke) : undefined,
         g.strokeWidth ? setLineWidth(g.strokeWidth) : undefined,
-        g.strokeLineCap ? setLineCap(g.strokeLineCap) : undefined,
+        g.strokeLineJoin ? setLineJoin(g.strokeLineJoin) : undefined, // untested
+        g.strokeMiterLimit ? setLineMiterLimit(g.strokeMiterLimit) : undefined, // untested
+        g.strokeLineCap ? setLineCap(g.strokeLineCap) : undefined, // untested
         g.strokeDashArray || g.strokeDashOffset
-          ? setDashPattern(g.strokeDashArray ?? [], g.strokeDashOffset ?? 0)
+          ? setDashPattern(g.strokeDashArray ?? [], g.strokeDashOffset ?? 0) // untested
           : undefined,
       );
 
+      // apply operators that comprise the shape
       g.operators.forEach((o) => ops.push(o));
 
+      // apply draw with fill and stroke, or separately
       ops.push(
         // prettier-ignore
         (g.fill && g.stroke) ? fillAndStroke(g.fillRule)
@@ -880,9 +889,9 @@ export const graphicToOperators = (
       break;
   }
 
-  // pop current graphic state back to parents
+  // pop current graphic state back to parents as this graphic is now complete
   ops.push(popGraphicsState());
 
-  // return defined ops
+  // only return defined operators
   return ops.filter(Boolean) as PDFOperator[];
 };
