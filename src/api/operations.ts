@@ -379,18 +379,20 @@ export const draw = (
   options: {
     x: number | PDFNumber;
     y: number | PDFNumber;
-    rotate?: Rotation;
-    scale?: number | PDFNumber;
-    graphicsState?: string | PDFName;
+    rotate: Rotation;
+    scale: number | PDFNumber;
     clipPath?: PDFOperator[];
-    clipRule?: 'nonezero' | 'evenodd';
+    clipRule?: 'nonzero' | 'evenodd';
+    graphicsState?: string | PDFName;
   },
 ) => {
   const operators: (PDFOperator | undefined)[] = [];
   operators.push(
     pushGraphicsState(),
+    options.graphicsState ? setGraphicsState(options.graphicsState) : undefined,
     translate(options.x, options.y),
-    rotateRadians(toRadians(options.rotate ?? degrees(0))),
+    rotateRadians(toRadians(options.rotate)),
+    scale(options.scale, options.scale),
     scale(1, -1), // make top left
   );
 

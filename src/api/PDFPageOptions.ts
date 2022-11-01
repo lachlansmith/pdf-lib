@@ -2,6 +2,7 @@ import { Color } from 'src/api/colors';
 import PDFFont from 'src/api/PDFFont';
 import { Rotation } from 'src/api/rotations';
 import { LineCapStyle } from 'src/api/operators';
+import { PDFOperator } from '..';
 
 export enum BlendMode {
   Normal = 'Normal',
@@ -155,6 +156,8 @@ export interface PDFPageDrawOptions {
   y?: number;
   rotate?: Rotation;
   scale?: number;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
 }
 
 export interface PDFPageApplyOptions {}

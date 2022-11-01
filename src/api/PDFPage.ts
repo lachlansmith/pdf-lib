@@ -1550,6 +1550,8 @@ export default class PDFPage {
       y: options.y || 0,
       rotate: options.rotate || degrees(0),
       scale: options.scale || 1,
+      clipPath: options.clipPath,
+      clipRule: options.clipRule,
     });
 
     operators.forEach((o) => contentStream.push(o));
