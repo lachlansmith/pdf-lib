@@ -1025,7 +1025,6 @@ _This example produces [this PDF](assets/pdfs/examples/draw_svg_paths.pdf)_.
 <!-- prettier-ignore -->
 ```js
 import { PDFDocument } from 'pdf-lib'
-import { rect } from 'pdf-lib/api/shape'
 import HtmlReactParser from 'html-react-parser'
 
 // Create a new PDFDocument
@@ -1033,6 +1032,7 @@ const pdfDoc = await PDFDocument.create()
 const page = pdfDoc.addPage()
 const height = page.getHeight()
 
+// node.js
 
 page.moveTo(0, height)  // SVG coordinate space is from top left opposed to PDFs bottom left
 const svg =
@@ -1053,6 +1053,17 @@ const jsx = HtmlReactParser(
 const graphicFromSvgString = await doc.parseJsx(jsx);
 page.draw(graphicFromSvgString) 
 
+const pdfBytes = await pdfDoc.save()
+
+// react.js
+
+import { PDFDocument } from 'pdf-lib'
+import { rect } from 'pdf-lib/api/shape'
+import { saveAs } from 'file-saver'
+
+const pdfDoc = await PDFDocument.create()
+const page = pdfDoc.addPage()
+const height = page.getHeight()
 
 page.moveTo(0, height - 250)
 const element =
@@ -1066,10 +1077,13 @@ const element =
 
 const graphicFromJsxElement = await doc.parseJsx(jsx);
 
-page.draw(graphicFromJsxElement, { clipPath: rect({ x: 0, y: 0, width: 80, height: 300 }), clipRule: 'nonzero' })
+// if necessary to prevent edge spillage apply clip based on view box
+page.draw(graphicFromJsxElement, { clipPath: rect({ x: 0, y: 0, width: 80, height: 300 }), clipRule: 'nonzero' });
 
-// Serialize the PDFDocument to bytes (a Uint8Array)
-const pdfBytes = await pdfDoc.save()
+// Serialize the PDFDocument to data Uri
+const pdfUri = await pdfDoc.saveAsBase64({ dataUri: true });
+
+saveAs(pdfUri, 'bless.pdf');
 
 // For example, `pdfBytes` can be:
 //   • Written to a file in Node

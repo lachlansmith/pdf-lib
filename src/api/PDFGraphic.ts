@@ -1,13 +1,13 @@
+import React from 'react';
+import ColorParser from 'color';
+
 import { LineCapStyle, LineJoinStyle } from 'src/api/operators';
 import { PDFImage, BlendMode } from 'src/api';
-import React from 'react';
 import PDFDocument from './PDFDocument';
 import { Color, ColorTypes } from 'src/api/colors';
 import { line, circle, ellipse, rect, path, shape } from 'src/api/shape';
 import { transform } from 'src/api/transform';
 import { PDFOperator } from 'src/core';
-
-import ColorParser from 'color';
 
 interface Iterator {
   [key: string]: any;
@@ -66,14 +66,32 @@ type PDFGraphic = Shape | Text | Image | Group;
 
 export default PDFGraphic;
 
+/**
+ * Utility function for converting snake case to camel case
+ *
+ * @param str
+ * @returns
+ */
 const camel = (str: string) =>
   str.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
 
+/**
+ *
+ * @param obj
+ * @returns
+ */
 const removeUndefined = <T extends PDFGraphic>(obj: T): T => {
   Object.keys(obj).forEach((key) => obj[key] === undefined && delete obj[key]);
   return obj;
 };
 
+/**
+ *
+ * @param props
+ * @param internalCss
+ * @param inlineStyle
+ * @returns
+ */
 const hierarchy = (props: any, internalCss: any, inlineStyle: any) => {
   // construct styles classes from listed class names
   let classes = {};
@@ -86,30 +104,35 @@ const hierarchy = (props: any, internalCss: any, inlineStyle: any) => {
     });
   }
 
-  // construct the presentation attributes based on style hierarchy
-  const presentationAttributes = {
-    ...{
-      clipPath: props.clipPath,
-      clipRule: props.clipRule,
-      fill: props.fill,
-      fileRule: props.fileRule,
-      stroke: props.stroke,
-      strokeWidth: props.strokeWidth,
-      strokeLineJoin: props.strokeLineJoin,
-      strokeMiterLimit: props.strokeMiterLimit,
-      strokeDashArray: props.strokeDashArray,
-      strokeDashOffset: props.strokeDashOffset,
-      strokeOpacity: props.strokeOpacity,
-      opacity: props.opacity,
-    },
+  return {
+    clipPath: props.clipPath,
+    clipRule: props.clipRule,
+    fill: props.fill,
+    fileRule: props.fileRule,
+    stroke: props.stroke,
+    strokeWidth: props.strokeWidth,
+    strokeLineJoin: props.strokeLineJoin,
+    strokeMiterLimit: props.strokeMiterLimit,
+    strokeDashArray: props.strokeDashArray,
+    strokeDashOffset: props.strokeDashOffset,
+    strokeOpacity: props.strokeOpacity,
+    opacity: props.opacity,
     ...classes,
     ...inlineStyle,
   };
-
-  return presentationAttributes;
 };
 
-const color = (str?: string, type?: 'RGB' | 'CMYK'): Color | undefined => {
+/**
+ * Convert color string to desired response type
+ *
+ * @param str
+ * @param type // TODO: currently not used, will be used
+ * @returns
+ */
+const color = (
+  str?: string,
+  type?: 'RGB' | 'CMYK' | 'Grayscale',
+): Color | undefined => {
   if (!str) return;
   switch (type) {
     case 'CMYK':
@@ -120,6 +143,15 @@ const color = (str?: string, type?: 'RGB' | 'CMYK'): Color | undefined => {
         magenta: m / 255,
         yellow: y / 255,
         key: k / 255,
+      };
+
+    case 'Grayscale':
+      const { gr, gg, gb } = ColorParser(str).grayscale().rgb().object();
+      return {
+        type: ColorTypes.RGB,
+        red: gr / 255,
+        green: gg / 255,
+        blue: gb / 255,
       };
 
     case 'RGB':
@@ -165,6 +197,9 @@ export class PDFGraphicState {
   }
 }
 
+/**
+ * DO NOT DESTRUCTURE AND AVOID DECLARING NEW VARIABLES AS YOU'LL SLOW THINGS DOWN
+ */
 export const JSXParsers: {
   [type: string]:
     | any
@@ -608,6 +643,15 @@ export const JSXParsers: {
     if (props['xlink:href']) {
       props.href = props['xlink:href']; // shouldn't be using this anyway so should be okay with performance hit
     }
+
+    // const res = await axios.get(new URL(props.href), {
+    //   responseType: 'text',
+    //   responseEncoding: 'base64',
+    // });
+
+    // const href = res.data;
+
+    // TODO: implement image URL support
 
     const mimeType = props.href.substring(
       props.href.indexOf(':') + 1,
