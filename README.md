@@ -1024,17 +1024,21 @@ _This example produces [this PDF](assets/pdfs/examples/draw_svg_paths.pdf)_.
 
 <!-- prettier-ignore -->
 ```js
-import { PDFDocument, rgb } from 'pdf-lib'
+import { PDFDocument } from 'pdf-lib'
+import { rect } from 'pdf-lib/api/shape'
 import HtmlReactParser from 'html-react-parser'
 
-// SVG path for a wavy line
+// Create a new PDFDocument
+const pdfDoc = await PDFDocument.create()
+const page = pdfDoc.addPage()
+const height = page.getHeight()
+
+
+page.moveTo(0, height)  // SVG coordinate space is from top left opposed to PDFs bottom left
 const svg =
     '<svg width="400" height="180"> \
         <rect x="50" y="20" width="150" height="150" style="fill:blue;stroke:pink;stroke-width:5;fill-opacity:0.1;stroke-opacity:0.9" /> \
     </svg>'
-
-// Create a new PDFDocument
-const pdfDoc = await PDFDocument.create()
 
 const jsx = HtmlReactParser(
     svg,
@@ -1045,15 +1049,12 @@ const jsx = HtmlReactParser(
     },
 ); // convert the svg string to valid JSX
 
+// return graphic a DOM like structure
 const graphicFromSvgString = await doc.parseJsx(jsx);
+page.draw(graphicFromSvgString) 
 
-const page = pdfDoc.addPage()
 
-const height = page.getHeight()
-page.moveTo(0, height)  // SVG coordinate space is from top left opposed to PDFs bottom left
-
-page.draw(graphicFromSvgString)
-
+page.moveTo(0, height - 250)
 const element =
     (<svg height="80" width="300">
         <g fill="none" stroke="black" strokeWidth="4">
@@ -1061,11 +1062,10 @@ const element =
             <path strokeDasharray="10,10" d="M5 40 l215 0" />
             <path strokeDasharray="20,10,5,5,5,10" d="M5 60 l215 0" />
         </g>
-    </svg>) as JSX.Element
+    </svg>) as JSX.Element // remove using straight javascript
 
 const graphicFromJsxElement = await doc.parseJsx(jsx);
 
-page.moveTo(0, height - 250)
 page.draw(graphicFromJsxElement, { clipPath: rect({ x: 0, y: 0, width: 80, height: 300 }), clipRule: 'nonzero' })
 
 // Serialize the PDFDocument to bytes (a Uint8Array)
