@@ -1045,28 +1045,28 @@ const jsx = HtmlReactParser(
     },
 ); // convert the svg string to valid JSX
 
-const graphic = await doc.parseJsx(jsx);
+const graphicFromSvgString = await doc.parseJsx(jsx);
 
 const page = pdfDoc.addPage()
 
 const height = page.getHeight()
 page.moveTo(0, height)  // SVG coordinate space is from top left opposed to PDFs bottom left
 
-page.draw(graphic)
+page.draw(graphicFromSvgString)
 
 const element =
-    <svg height="80" width="300">
+    (<svg height="80" width="300">
         <g fill="none" stroke="black" stroke-width="4">
             <path stroke-dasharray="5,5" d="M5 20 l215 0" />
             <path stroke-dasharray="10,10" d="M5 40 l215 0" />
             <path stroke-dasharray="20,10,5,5,5,10" d="M5 60 l215 0" />
         </g>
-    </svg>
+    </svg>) as JSX.Element
 
-const graphic2 = await doc.parseJsx(jsx);
+const graphicFromJsxElement = await doc.parseJsx(jsx);
 
 page.moveTo(0, height - 250)
-page.draw(graphic, { clipPath: rect({ x: 0, y: 0, width: 80, height: 300 }), clipRule: 'nonzero' })
+page.draw(graphicFromJsxElement, { clipPath: rect({ x: 0, y: 0, width: 80, height: 300 }), clipRule: 'nonzero' })
 
 // Serialize the PDFDocument to bytes (a Uint8Array)
 const pdfBytes = await pdfDoc.save()
