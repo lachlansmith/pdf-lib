@@ -1056,10 +1056,10 @@ page.draw(graphicFromSvgString)
 
 const element =
     (<svg height="80" width="300">
-        <g fill="none" stroke="black" stroke-width="4">
-            <path stroke-dasharray="5,5" d="M5 20 l215 0" />
-            <path stroke-dasharray="10,10" d="M5 40 l215 0" />
-            <path stroke-dasharray="20,10,5,5,5,10" d="M5 60 l215 0" />
+        <g fill="none" stroke="black" strokeWidth="4">
+            <path strokeDasharray="5,5" d="M5 20 l215 0" />
+            <path strokeDasharray="10,10" d="M5 40 l215 0" />
+            <path strokeDasharray="20,10,5,5,5,10" d="M5 60 l215 0" />
         </g>
     </svg>) as JSX.Element
 
