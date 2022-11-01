@@ -398,7 +398,7 @@ export const draw = (
 
   if (options.clipPath) {
     options.clipPath.forEach((c) => operators.push(c));
-    operators.push(clip(options.clipRule ? 'nonzero' : undefined));
+    operators.push(clip(options.clipRule));
     operators.push(endPath());
   }
 
