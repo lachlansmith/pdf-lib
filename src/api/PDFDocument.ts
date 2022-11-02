@@ -722,15 +722,16 @@ export default class PDFDocument {
    * @param indices The indices of the pages that should be copied.
    * @returns Resolves with an array of pages copied into this document.
    */
-  async copyPages(srcDoc: PDFDocument, indices: number[]): Promise<PDFPage[]> {
+  async copyPages(srcDoc: PDFDocument, indices?: number[]): Promise<PDFPage[]> {
     assertIs(srcDoc, 'srcDoc', [[PDFDocument, 'PDFDocument']]);
     assertIs(indices, 'indices', [Array]);
     await srcDoc.flush();
     const copier = PDFObjectCopier.for(srcDoc.context, this.context);
     const srcPages = srcDoc.getPages();
-    const copiedPages: PDFPage[] = new Array(indices.length);
-    for (let idx = 0, len = indices.length; idx < len; idx++) {
-      const srcPage = srcPages[indices[idx]];
+    const length = indices ? indices.length : srcPages.length;
+    const copiedPages: PDFPage[] = new Array(length);
+    for (let idx = 0, len = length; idx < len; idx++) {
+      const srcPage = srcPages[indices ? indices[idx] : idx];
       const copiedPage = copier.copy(srcPage.node);
       const ref = this.context.register(copiedPage);
       copiedPages[idx] = PDFPage.of(copiedPage, ref, this);
