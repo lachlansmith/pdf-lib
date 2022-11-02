@@ -112,7 +112,8 @@
 - Draw Images
 - Draw PDF Pages
 - Draw Vector Graphics
-- Draw SVG Paths
+- Draw Paths
+- Draw SVGs
 - Measure width and height of text
 - Embed Fonts (supports UTF-8 and UTF-16 character sets)
 - Set document metadata

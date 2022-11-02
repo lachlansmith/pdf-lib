@@ -218,6 +218,13 @@ export const JSXParsers: {
     state: PDFGraphicState,
   ) => Promise<PDFGraphic> | PDFGraphic | Promise<void> | void;
 } = {
+  /**
+   *
+   * @param props
+   * @param doc
+   * @param state
+   * @returns
+   */
   async svg(
     props: any,
     doc: PDFDocument,
@@ -260,6 +267,13 @@ export const JSXParsers: {
     } as Group);
   },
 
+  /**
+   *
+   * @param props
+   * @param doc
+   * @param state
+   * @returns
+   */
   async g(
     props: any,
     doc: PDFDocument,
@@ -325,6 +339,13 @@ export const JSXParsers: {
     return this.g(props, doc, state); // SVG 2 spec treats all non SVG elements as g
   },
 
+  /**
+   *
+   * @param props
+   * @param _
+   * @param state
+   * @returns
+   */
   path(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
     const presentationAttributes = hierarchy(
       props,
@@ -367,6 +388,13 @@ export const JSXParsers: {
     } as Shape);
   },
 
+  /**
+   *
+   * @param props
+   * @param _
+   * @param state
+   * @returns
+   */
   polyline(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
     const presentationAttributes = hierarchy(
       props,
@@ -396,6 +424,13 @@ export const JSXParsers: {
     } as Shape);
   },
 
+  /**
+   *
+   * @param props
+   * @param _
+   * @param state
+   * @returns
+   */
   polygon(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
     const presentationAttributes = hierarchy(
       props,
@@ -438,6 +473,13 @@ export const JSXParsers: {
     } as Shape);
   },
 
+  /**
+   *
+   * @param props
+   * @param _
+   * @param state
+   * @returns
+   */
   circle(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
     const presentationAttributes = hierarchy(
       props,
@@ -484,6 +526,13 @@ export const JSXParsers: {
     } as Shape);
   },
 
+  /**
+   *
+   * @param props
+   * @param _
+   * @param state
+   * @returns
+   */
   ellipse(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
     const presentationAttributes = hierarchy(
       props,
@@ -531,6 +580,13 @@ export const JSXParsers: {
     } as Shape);
   },
 
+  /**
+   *
+   * @param props
+   * @param _
+   * @param state
+   * @returns
+   */
   rect(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
     const presentationAttributes = hierarchy(
       props,
@@ -580,6 +636,13 @@ export const JSXParsers: {
     } as Shape);
   },
 
+  /**
+   *
+   * @param props
+   * @param _
+   * @param state
+   * @returns
+   */
   line(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
     const presentationAttributes = hierarchy(
       props,
@@ -614,6 +677,12 @@ export const JSXParsers: {
     } as Shape);
   },
 
+  /**
+   *
+   * @param props
+   * @param doc
+   * @param state
+   */
   defs(props: any, doc: PDFDocument, state: PDFGraphicState): void {
     const children = React.Children.toArray(props.children);
     children.forEach((child: any) => {
@@ -625,6 +694,12 @@ export const JSXParsers: {
     });
   },
 
+  /**
+   *
+   * @param props
+   * @param _
+   * @param state
+   */
   style(props: any, _: PDFDocument, state: PDFGraphicState): void {
     const innerHTML = props.dangerouslySetInnerHTML.__html;
     const regCls = /.(.*?){(.*?)}/g;
@@ -646,6 +721,13 @@ export const JSXParsers: {
     }
   },
 
+  /**
+   *
+   * @param props
+   * @param doc
+   * @param state
+   * @returns
+   */
   async image(
     props: any,
     doc: PDFDocument,
@@ -705,22 +787,29 @@ export const JSXParsers: {
           transform: transform(props.transform),
         } as Image);
 
-      /**
-       *
-       * Image svg support may be added if both a means to pass the data uri to a string and then to valid jsx is added to dependencies
-       *
-       * This is not something willing todo at this time, but it would look like below
-       */
+      // TODO: Image svg support may be added if a means (to pass a data uri to a string and then) to pass valid jsx is added to dependencies
+
+      // This is not something willing to do at this time, but it would look like below
 
       //   case 'image/svg+xml':
-      //     const jsx = HtmlReactParser(
-      //       Buffer.from(props.href.split(';base64,')[1], 'base64').toString(), // base64 encoding to svg string
-      //       {
-      //         htmlparser2: {
-      //           lowerCaseTags: false,
-      //         },
+      //     let string = props.href;
+      //     if (string === 'dataUri') {
+      //       string = Buffer.from(
+      //         string.split(';base64,')[1],
+      //         'base64',
+      //       ).toString(); // base64 encoding to svg string
+      //     } else if (string === 'url') {
+      //       const res = await axios.get(new URL(props.href), {
+      //         responseType: 'text',
+      //       });
+      //       string = res.data;
+      //     }
+
+      //     const jsx = HtmlReactParser(string, {
+      //       htmlparser2: {
+      //         lowerCaseTags: false,
       //       },
-      //     );
+      //     });
 
       //     return await doc.parseJsx(jsx);
 
