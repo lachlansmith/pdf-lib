@@ -830,22 +830,9 @@ export const graphicToOperators = (
     g.transform.forEach((t) => ops.push(t));
   }
 
-  // maybe apply mix blend mode and opacity to graphic state
-  if (g.mixBlendMode || g.opacity || g.strokeOpacity) {
-    const graphicsState = page.doc.context.obj({
-      Type: 'ExtGState',
-      ca: g.opacity,
-      CA: g.strokeOpacity,
-      BM: g.mixBlendMode,
-    });
-
-    const GState = page.node.newExtGState('GS', graphicsState);
-    ops.push(setGraphicsState(GState));
-  }
-
   // maybe apply clipping to graphic state
   if (g.clipPath) {
-    g.clipPath.forEach((o) => ops.push(o));
+    g.clipPath.operators.forEach((o) => ops.push(o));
     ops.push(clip(g.clipRule));
     ops.push(endPath());
   }
@@ -860,23 +847,36 @@ export const graphicToOperators = (
       break;
 
     case 'shape':
+      // maybe apply mix blend mode and opacity to graphic state
+      if (g.mixBlendMode || g.fillOpacity || g.strokeOpacity) {
+        const graphicsState = page.doc.context.obj({
+          Type: 'ExtGState',
+          ca: g.fillOpacity,
+          CA: g.strokeOpacity,
+          BM: g.mixBlendMode,
+        });
+
+        const GState = page.node.newExtGState('GS', graphicsState);
+        ops.push(setGraphicsState(GState));
+      }
+
       // apply all presentation attributes and later stripped those undefined
       ops.push(
         g.fill ? setFillingColor(g.fill) : undefined,
         g.stroke ? setStrokingColor(g.stroke) : undefined,
         g.strokeWidth ? setLineWidth(g.strokeWidth) : undefined,
-        g.strokeLineJoin ? setLineJoin(g.strokeLineJoin) : undefined, // untested
-        g.strokeMiterLimit ? setLineMiterLimit(g.strokeMiterLimit) : undefined, // untested
-        g.strokeLineCap ? setLineCap(g.strokeLineCap) : undefined, // untested
+        g.strokeLineJoin ? setLineJoin(g.strokeLineJoin) : undefined, //TODO: untested
+        g.strokeMiterLimit ? setLineMiterLimit(g.strokeMiterLimit) : undefined, //TODO: untested
+        g.strokeLineCap ? setLineCap(g.strokeLineCap) : undefined, //TODO: untested
         g.strokeDashArray || g.strokeDashOffset
-          ? setDashPattern(g.strokeDashArray ?? [], g.strokeDashOffset ?? 0) // untested
+          ? setDashPattern(g.strokeDashArray ?? [], g.strokeDashOffset ?? 0) //TODO: untested
           : undefined,
       );
 
-      // apply operators that comprise the shape
+      // apply operators
       g.operators.forEach((o) => ops.push(o));
 
-      // apply draw with fill and stroke, or separately
+      // apply fill and stroke, or separately
       ops.push(
         // prettier-ignore
         (g.fill && g.stroke) ? fillAndStroke(g.fillRule)
@@ -892,6 +892,19 @@ export const graphicToOperators = (
       break;
 
     case 'image':
+      // maybe apply mix blend mode and opacity to graphic state
+      if (g.mixBlendMode || g.opacity) {
+        const graphicsState = page.doc.context.obj({
+          Type: 'ExtGState',
+          ca: g.opacity,
+          CA: g.opacity,
+          BM: g.mixBlendMode,
+        });
+
+        const GState = page.node.newExtGState('GS', graphicsState);
+        ops.push(setGraphicsState(GState));
+      }
+
       const name = page.node.newXObject('Image', g.image.ref);
       ops.push(translate(0, g.height)); // shift by height corrects flip
       ops.push(scale(g.width, -g.height)); // negative (flip) corrects upside down drawing

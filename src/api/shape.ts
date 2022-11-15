@@ -488,7 +488,12 @@ const segmentToBezier = (
   return result;
 };
 
-export const path = (d: string) => apply(parse(d));
+export const path = (d: string): PDFOperator[] => apply(parse(d));
+
+export const polygon = (points: string): PDFOperator[] =>
+  path('M' + points + 'z');
+
+export const polyline = (points: string): PDFOperator[] => path('M' + points);
 
 export const rect = (
   x: number,
@@ -497,7 +502,7 @@ export const rect = (
   height: number,
   rx?: number,
   ry?: number,
-) => {
+): PDFOperator[] => {
   const X = x;
   const Y = y;
   const W = width;
@@ -551,7 +556,12 @@ export const arc = (options: {
     closePath(),
   ].filter(Boolean) as PDFOperator[];
 
-export const ellipse = (x: number, y: number, rx: number, ry: number) =>
+export const ellipse = (
+  x: number,
+  y: number,
+  rx: number,
+  ry: number,
+): PDFOperator[] =>
   arc({
     x,
     y: y - ry,
@@ -564,7 +574,7 @@ export const ellipse = (x: number, y: number, rx: number, ry: number) =>
     ey: 0,
   });
 
-export const circle = (x: number, y: number, r: number) =>
+export const circle = (x: number, y: number, r: number): PDFOperator[] =>
   arc({
     x,
     y: y - r,
@@ -577,11 +587,12 @@ export const circle = (x: number, y: number, r: number) =>
     ey: 0,
   });
 
-export const line = (x1: number, y1: number, x2: number, y2: number) => [
-  moveTo(x1, y1),
-  lineTo(x2, y2),
-  closePath(),
-];
+export const line = (
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+): PDFOperator[] => [moveTo(x1, y1), lineTo(x2, y2), closePath()];
 
 export const shape = (s: Shape | Group): PDFOperator[] => {
   const ops: (PDFOperator | undefined)[] = [];

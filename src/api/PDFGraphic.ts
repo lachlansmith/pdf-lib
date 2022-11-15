@@ -4,10 +4,68 @@ import ColorParser from 'color';
 import { LineCapStyle, LineJoinStyle } from 'src/api/operators';
 import { PDFImage, BlendMode } from 'src/api';
 import PDFDocument from './PDFDocument';
-import { Color, ColorTypes } from 'src/api/colors';
-import { line, circle, ellipse, rect, path, shape } from 'src/api/shape';
+import { Color, ColorTypes, RGB } from 'src/api/colors';
+import {
+  line,
+  circle,
+  ellipse,
+  rect,
+  path,
+  polygon,
+  polyline,
+  shape,
+} from 'src/api/shape';
 import { transform } from 'src/api/transform';
 import { PDFOperator } from 'src/core';
+
+interface Mask {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  maskContentUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
+  maskUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
+  operators: PDFOperator[];
+}
+
+interface Filter {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  filterUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
+  primitiveUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
+  effects: PDFGraphic[];
+}
+
+interface ClipPath {
+  clipPathUnits: 'userSpaceOnUse' | 'objectBoundingBox';
+  operators: PDFOperator[];
+}
+
+interface LinearGradient {
+  x1?: number;
+  y1?: number;
+  x2: number;
+  y2?: number;
+  gradientUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
+  gradientTransform?: any;
+  spreadMethod?: 'pad' | 'reflect' | 'reflect';
+  stops: PDFGraphic[];
+}
+
+interface RadialGradient {
+  cx?: number;
+  cy?: number;
+  r?: number;
+  fr: number;
+  fx?: number;
+  fy?: number;
+  gradientUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
+  gradientTransform?: any;
+  spreadMethod?: 'pad' | 'reflect' | 'reflect';
+  stops: PDFGraphic[];
+}
 
 interface Iterator {
   [key: string]: any;
@@ -15,10 +73,10 @@ interface Iterator {
 
 interface Base extends Iterator {
   transform?: PDFOperator[];
-  clipPath?: PDFOperator[];
+  mask?: Mask;
+  filter?: Filter; //unknown how to handle this at this time
+  clipPath?: ClipPath;
   clipRule?: 'nonzero' | 'evenodd';
-  opacity?: number;
-  strokeOpacity?: number;
   mixBlendMode?: BlendMode;
 }
 
@@ -27,6 +85,8 @@ export interface Shape extends Base {
   operators: PDFOperator[];
   fill?: Color;
   fillRule?: 'nonzero' | 'evenodd';
+  fillOpacity?: number;
+  strokeOpacity?: number;
   stroke?: Color;
   strokeWidth?: number;
   strokeLineJoin?: LineJoinStyle;
@@ -38,7 +98,7 @@ export interface Shape extends Base {
 
 export interface Text extends Base {
   type: 'text';
-  value: string;
+  children: Text[];
 }
 
 export interface Image extends Base {
@@ -46,12 +106,15 @@ export interface Image extends Base {
   image: PDFImage;
   width: number;
   height: number;
+  opacity?: number;
 }
 
 export interface Group extends Base {
   type: 'group';
   fill?: Color;
   fillRule?: 'nonzero' | 'evenodd';
+  fillOpacity?: number;
+  strokeOpacity?: number;
   stroke?: Color;
   strokeWidth?: number;
   strokeLineJoin?: LineJoinStyle;
@@ -65,6 +128,18 @@ export interface Group extends Base {
 type PDFGraphic = Shape | Text | Image | Group;
 
 export default PDFGraphic;
+
+export class PDFGraphicState {
+  internalCSS: any;
+  defs: {
+    [id: string]: Mask | Filter | ClipPath | LinearGradient | RadialGradient;
+  };
+
+  constructor() {
+    this.internalCSS = {};
+    this.defs = {};
+  }
+}
 
 /**
  * Utility function for converting snake case to camel case
@@ -80,23 +155,28 @@ const camel = (str: string) =>
  * @param obj
  * @returns
  */
-const removeUndefined = <T extends PDFGraphic>(obj: T): T => {
+const removeUndefined = <T extends Iterator>(obj: T): T => {
   Object.keys(obj).forEach((key) => obj[key] === undefined && delete obj[key]);
   return obj;
 };
 
 /**
+ * Constructs style hierachy as presentation attributes
  *
- * @param props
+ * @param presentationAttributes
  * @param internalCss
  * @param inlineStyle
- * @returns
+ * @returns attributes
  */
-const hierarchy = (props: any, internalCss: any, inlineStyle: any) => {
+const attributes = (
+  presentationAttributes: any,
+  internalCss: any,
+  inlineStyle: any,
+) => {
   // construct styles classes from listed class names
   let classes = {};
-  if (props.className) {
-    const names = props.className.split(' '); // multiple internal styles
+  if (presentationAttributes.className) {
+    const names = presentationAttributes.className.split(' '); // multiple internal styles
 
     names.forEach((name: string) => {
       if (!(name in internalCss)) return;
@@ -105,20 +185,25 @@ const hierarchy = (props: any, internalCss: any, inlineStyle: any) => {
   }
 
   return {
-    clipPath: props.clipPath,
-    clipRule: props.clipRule,
-    fill: props.fill,
-    fileRule: props.fileRule,
-    stroke: props.stroke,
-    strokeWidth: props.strokeWidth,
-    strokeLineJoin: props.strokeLineJoin,
-    strokeMiterLimit: props.strokeMiterLimit,
-    strokeDashArray: props.strokeDashArray,
-    strokeDashOffset: props.strokeDashOffset,
-    strokeOpacity: props.strokeOpacity,
-    opacity: props.opacity,
+    color: presentationAttributes.color,
+    mask: presentationAttributes.mask,
+    filter: presentationAttributes.filter,
+    clipPath: presentationAttributes.clipPath,
+    clipRule: presentationAttributes.clipRule,
+    fill: presentationAttributes.fill,
+    fileRule: presentationAttributes.fileRule,
+    stroke: presentationAttributes.stroke,
+    strokeWidth: presentationAttributes.strokeWidth,
+    strokeLineJoin: presentationAttributes.strokeLineJoin,
+    strokeMiterLimit: presentationAttributes.strokeMiterLimit,
+    strokeLineCap: presentationAttributes.strokeLineCap,
+    strokeDashArray: presentationAttributes.strokeDashArray,
+    strokeDashOffset: presentationAttributes.strokeDashOffset,
+    strokeOpacity: presentationAttributes.strokeOpacity,
+    fillOpacity: presentationAttributes.fillOpacity,
+    opacity: presentationAttributes.opacity,
     ...classes,
-    ...inlineStyle,
+    ...(inlineStyle ? inlineStyle : {}),
   };
 };
 
@@ -126,66 +211,63 @@ const hierarchy = (props: any, internalCss: any, inlineStyle: any) => {
  * Convert color string to desired response type
  *
  * @param str
- * @param type // TODO: currently not used, will be used
+ * @param color
  * @returns
  */
 const color = (
-  str?: string,
-  type?: 'RGB' | 'CMYK' | 'Grayscale',
-): Color | undefined => {
-  if (!str) return;
-  switch (type) {
-    case 'CMYK':
-      const { c, m, y, k } = ColorParser(str).cmyk().object();
-      return {
-        type: ColorTypes.CMYK,
-        cyan: c / 255,
-        magenta: m / 255,
-        yellow: y / 255,
-        key: k / 255,
-      };
-
-    case 'Grayscale':
-      const { gr, gg, gb } = ColorParser(str).grayscale().rgb().object();
-      return {
-        type: ColorTypes.RGB,
-        red: gr / 255,
-        green: gg / 255,
-        blue: gb / 255,
-      };
-
-    case 'RGB':
-    default:
-      const { r, g, b } = ColorParser(str).rgb().object();
-      return {
-        type: ColorTypes.RGB,
-        red: r / 255,
-        green: g / 255,
-        blue: b / 255,
-      };
+  defs: {
+    [id: string]: Mask | Filter | ClipPath | LinearGradient | RadialGradient;
+  },
+  str: string | undefined,
+  color?: Color,
+): Color | LinearGradient | RadialGradient | undefined => {
+  if (str === 'none') return undefined;
+  if (!str) return color;
+  const match = /url\((.*)\)/g.exec(str);
+  if (match) {
+    return defs[match[1]] as LinearGradient | RadialGradient;
   }
+  const { r, g, b } = ColorParser(str).rgb().object();
+  return {
+    type: ColorTypes.RGB,
+    red: r / 255,
+    green: g / 255,
+    blue: b / 255,
+  };
 };
 
 /**
+ * Convert color string to desired response type
  *
- * @param defs
- * @param clipString
+ * @param fillOrStrokeOpacity
+ * @param opacity
  * @returns
  */
-const clipPath = (
-  defs: any,
-  clipString?: string,
-): PDFOperator[] | undefined => {
-  if (!clipString) return;
+const opacity = (fillOrStrokeOpacity?: string, opacity?: string) => {
+  return fillOrStrokeOpacity
+    ? parseFloat(fillOrStrokeOpacity)
+    : opacity
+    ? parseFloat(opacity)
+    : undefined;
+};
 
-  let clip: PDFOperator[] = [];
-  const match = /url\((.*)\)/g.exec(clipString);
+const url = (defs: any, str?: string) => {
+  if (!str) return undefined;
+
+  const match = /url\((.*)\)/g.exec(str);
   if (match) {
-    clip = defs[match[1]] as PDFOperator[];
+    return defs[match[1]] as PDFOperator[];
   }
 
-  return clip;
+  return undefined;
 };
+
+const clipPath = (defs: any, clipString?: string): PDFOperator[] | undefined =>
+  url(defs, clipString);
+const filter = (defs: any, filterString?: string): PDFOperator[] | undefined =>
+  url(defs, filterString);
+const mask = (defs: any, maskString?: string): PDFOperator[] | undefined =>
+  url(defs, maskString);
 
 /**
  *
@@ -193,23 +275,15 @@ const clipPath = (
  * @returns
  */
 const mixBlendMode = (blendmode?: string): BlendMode | undefined => {
-  if (!blendmode) return;
+  if (!blendmode) return undefined;
   const blendMode = camel(blendmode);
   return (blendMode.charAt(0).toUpperCase() + blendMode.slice(1)) as BlendMode;
 };
 
-export class PDFGraphicState {
-  internalCSS: any;
-  defs: any;
-
-  constructor() {
-    this.internalCSS = {};
-    this.defs = {};
-  }
-}
-
 /**
  * DO NOT DESTRUCTURE AND AVOID DECLARING NEW VARIABLES AS YOU'LL SLOW THINGS DOWN
+ *
+ * Parsers are based of element index defined at https://www.w3.org/TR/SVG/eltindex.html
  */
 export const JSXParsers: {
   [type: string]: (
@@ -218,285 +292,12 @@ export const JSXParsers: {
     state: PDFGraphicState,
   ) => Promise<PDFGraphic> | PDFGraphic | Promise<void> | void;
 } = {
-  /**
-   *
-   * @param props
-   * @param doc
-   * @param state
-   * @returns
-   */
-  async svg(
-    props: any,
-    doc: PDFDocument,
-    state: PDFGraphicState,
-  ): Promise<Group> {
-    const presentationAttributes = hierarchy(
-      props,
-      state.internalCSS,
-      props.style ? props.style : {},
-    );
-
-    const children: (PDFGraphic | undefined)[] = [];
-    for (const child of React.Children.toArray(props.children)) {
-      if (
-        typeof child === 'string' ||
-        typeof child === 'number' ||
-        !('type' in child)
-      ) {
-        // TODO: figure out if these case are applicable
-        continue;
-      }
-
-      const tagName = child.type.toString();
-      if (typeof this[tagName] === 'function') {
-        children.push(
-          (await this[tagName](child.props, doc, state)) as PDFGraphic,
-        );
-      }
-    }
-
-    return removeUndefined({
-      type: 'group',
-      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
-      clipRule: presentationAttributes.clipRule,
-      opacity: parseFloat(presentationAttributes.opacity),
-      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
-      mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
-      transform: transform(props.transform),
-      children: children.filter(Boolean) as PDFGraphic[],
-    } as Group);
+  a() {
+    throw new Error('Not yet supported element, a');
   },
 
-  /**
-   *
-   * @param props
-   * @param doc
-   * @param state
-   * @returns
-   */
-  async g(
-    props: any,
-    doc: PDFDocument,
-    state: PDFGraphicState,
-  ): Promise<Group> {
-    const presentationAttributes = hierarchy(
-      props,
-      state.internalCSS,
-      props.style ? props.style : {},
-    );
-
-    const children: (PDFGraphic | undefined)[] = [];
-    for (const child of React.Children.toArray(props.children)) {
-      if (
-        typeof child === 'string' ||
-        typeof child === 'number' ||
-        !('type' in child)
-      ) {
-        // TODO: figure out if these case are applicable
-        continue;
-      }
-
-      const tagName = child.type.toString();
-      if (typeof this[tagName] === 'function') {
-        children.push(
-          (await this[tagName](child.props, doc, state)) as PDFGraphic,
-        );
-      }
-    }
-
-    return removeUndefined({
-      type: 'group',
-      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
-      clipRule: presentationAttributes.clipRule,
-      fill:
-        presentationAttributes.fill && presentationAttributes.fill !== 'none'
-          ? color(presentationAttributes.fill)
-          : undefined,
-      fillRule: presentationAttributes.fillRule,
-      stroke:
-        presentationAttributes.stroke &&
-        presentationAttributes.stroke !== 'none'
-          ? color(presentationAttributes.stroke)
-          : undefined,
-      strokeWidth: presentationAttributes.strokeWidth,
-      strokeLineJoin: presentationAttributes.strokeLineJoin,
-      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
-      strokeDashArray: presentationAttributes.strokeDashArray,
-      strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: parseFloat(presentationAttributes.opacity),
-      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
-      mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
-      transform: transform(props.transform),
-      children: children.filter(Boolean) as PDFGraphic[],
-    } as Group);
-  },
-
-  ['Symbol(react.fragment)'](
-    props: any,
-    doc: PDFDocument,
-    state: PDFGraphicState,
-  ) {
-    return this.g(props, doc, state); // SVG 2 spec treats all non SVG elements as g
-  },
-
-  /**
-   *
-   * @param props
-   * @param _
-   * @param state
-   * @returns
-   */
-  path(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
-    const presentationAttributes = hierarchy(
-      props,
-      state.internalCSS,
-      props.style ? props.style : {},
-    );
-
-    let fill: Color | undefined;
-    if (presentationAttributes.fill) {
-      if (presentationAttributes.fill !== 'none') {
-        fill = color(presentationAttributes.fill);
-      } else {
-        fill = undefined;
-      }
-    } else {
-      fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
-    }
-
-    return removeUndefined({
-      type: 'shape',
-      operators: path(props.d),
-      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
-      clipRule: presentationAttributes.clipRule,
-      fill,
-      fillRule: presentationAttributes.fillRule,
-      stroke:
-        presentationAttributes.stroke &&
-        presentationAttributes.stroke !== 'none'
-          ? color(presentationAttributes.stroke)
-          : undefined,
-      strokeWidth: presentationAttributes.strokeWidth,
-      strokeLineJoin: presentationAttributes.strokeLineJoin,
-      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
-      strokeDashArray: presentationAttributes.strokeDashArray,
-      strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: parseFloat(presentationAttributes.opacity),
-      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
-      mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
-      transform: transform(props.transform),
-    } as Shape);
-  },
-
-  /**
-   *
-   * @param props
-   * @param _
-   * @param state
-   * @returns
-   */
-  polyline(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
-    const presentationAttributes = hierarchy(
-      props,
-      state.internalCSS,
-      props.style ? props.style : {},
-    );
-
-    return removeUndefined({
-      type: 'shape',
-      operators: path('M' + props.points),
-      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
-      clipRule: presentationAttributes.clipRule,
-      stroke:
-        presentationAttributes.stroke &&
-        presentationAttributes.stroke !== 'none'
-          ? color(presentationAttributes.stroke)
-          : undefined,
-      strokeWidth: presentationAttributes.strokeWidth,
-      strokeLineJoin: presentationAttributes.strokeLineJoin,
-      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
-      strokeDashArray: presentationAttributes.strokeDashArray,
-      strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: parseFloat(presentationAttributes.opacity),
-      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
-      mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
-      transform: transform(props.transform),
-    } as Shape);
-  },
-
-  /**
-   *
-   * @param props
-   * @param _
-   * @param state
-   * @returns
-   */
-  polygon(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
-    const presentationAttributes = hierarchy(
-      props,
-      state.internalCSS,
-      props.style ? props.style : {},
-    );
-
-    let fill: Color | undefined;
-    if (presentationAttributes.fill) {
-      if (presentationAttributes.fill !== 'none') {
-        fill = color(presentationAttributes.fill);
-      } else {
-        fill = undefined;
-      }
-    } else {
-      fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
-    }
-
-    return removeUndefined({
-      type: 'shape',
-      operators: path('M' + props.points + 'z'),
-      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
-      clipRule: presentationAttributes.clipRule,
-      fill,
-      fillRule: presentationAttributes.fillRule,
-      stroke:
-        presentationAttributes.stroke &&
-        presentationAttributes.stroke !== 'none'
-          ? color(presentationAttributes.stroke)
-          : undefined,
-      strokeWidth: presentationAttributes.strokeWidth,
-      strokeLineJoin: presentationAttributes.strokeLineJoin,
-      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
-      strokeDashArray: presentationAttributes.strokeDashArray,
-      strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: parseFloat(presentationAttributes.opacity),
-      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
-      mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
-      transform: transform(props.transform),
-    } as Shape);
-  },
-
-  /**
-   *
-   * @param props
-   * @param _
-   * @param state
-   * @returns
-   */
   circle(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
-    const presentationAttributes = hierarchy(
-      props,
-      state.internalCSS,
-      props.style ? props.style : {},
-    );
-
-    let fill: Color | undefined;
-    if (presentationAttributes.fill) {
-      if (presentationAttributes.fill !== 'none') {
-        fill = color(presentationAttributes.fill);
-      } else {
-        fill = undefined;
-      }
-    } else {
-      fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
-    }
+    const attr = attributes(props, state.internalCSS, props.style);
 
     return removeUndefined({
       type: 'shape',
@@ -505,51 +306,87 @@ export const JSXParsers: {
         parseFloat(props.cy),
         parseFloat(props.r),
       ),
-      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
-      clipRule: presentationAttributes.clipRule,
-      fill,
-      fillRule: presentationAttributes.fillRule,
-      stroke:
-        presentationAttributes.stroke &&
-        presentationAttributes.stroke !== 'none'
-          ? color(presentationAttributes.stroke)
-          : undefined,
-      strokeWidth: presentationAttributes.strokeWidth,
-      strokeLineJoin: presentationAttributes.strokeLineJoin,
-      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
-      strokeDashArray: presentationAttributes.strokeDashArray,
-      strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: parseFloat(presentationAttributes.opacity),
-      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
-      mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
+      mask: mask(state.defs, attr.mask),
+      filter: filter(state.defs, attr.filter),
+      clipPath: clipPath(state.defs, attr.clipPath),
+      clipRule: attr.clipRule,
+      fill: color(state.defs, attr.fill, {
+        type: ColorTypes.RGB,
+        red: 0,
+        green: 0,
+        blue: 0,
+      } as RGB),
+      fillRule: attr.fillRule,
+      fillOpacity: opacity(attr.fillOpacity, attr.opacity),
+      stroke: color(state.defs, attr.stroke),
+      strokeWidth: attr.strokeWidth,
+      strokeLineJoin: attr.strokeLineJoin,
+      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
+      strokeLineCap: attr.strokeLineCap,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: parseFloat(attr.strokeDashOffset),
+      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
+      mixBlendMode: mixBlendMode(attr.mixBlendMode),
       transform: transform(props.transform),
     } as Shape);
   },
 
-  /**
-   *
-   * @param props
-   * @param _
-   * @param state
-   * @returns
-   */
-  ellipse(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
-    const presentationAttributes = hierarchy(
-      props,
-      state.internalCSS,
-      props.style ? props.style : {},
-    );
-
-    let fill: Color | undefined;
-    if (presentationAttributes.fill) {
-      if (presentationAttributes.fill !== 'none') {
-        fill = color(presentationAttributes.fill);
-      } else {
-        fill = undefined;
+  async clipPath(
+    props: any,
+    doc: PDFDocument,
+    state: PDFGraphicState,
+  ): Promise<void> {
+    const children: (PDFGraphic | undefined)[] = [];
+    for (const child of React.Children.toArray(props.children)) {
+      if (
+        typeof child === 'string' ||
+        typeof child === 'number' ||
+        !('type' in child)
+      ) {
+        // TODO: figure out if these cases are applicable
+        continue;
       }
-    } else {
-      fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
+
+      const tagName = child.type.toString();
+      if (typeof this[tagName] === 'function') {
+        children.push(
+          (await this[tagName](child.props, doc, state)) as PDFGraphic,
+        );
+      }
     }
+
+    state.defs['#' + props.id] = removeUndefined({
+      clipPathUnits: props.clipPathUnits,
+      operators: shape({
+        type: 'group',
+        children: children.filter(Boolean) as PDFGraphic[],
+      }),
+    } as ClipPath);
+  },
+
+  defs(props: any, doc: PDFDocument, state: PDFGraphicState): void {
+    const children = React.Children.toArray(props.children);
+    children.forEach((child: any) => {
+      try {
+        this[child.type](child.props, doc, state);
+      } catch (err) {
+        throw new Error(
+          'Unsupported or not yet supported element, ' + child.type,
+        );
+      }
+    });
+  },
+
+  desc() {
+    throw new Error('Unsupported or not yet supported element, desc');
+  },
+
+  discard() {
+    throw new Error('Unsupported or not yet supported element, discard');
+  },
+
+  ellipse(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
+    const attr = attributes(props, state.internalCSS, props.style);
 
     return removeUndefined({
       type: 'shape',
@@ -559,189 +396,229 @@ export const JSXParsers: {
         parseFloat(props.rx),
         parseFloat(props.ry),
       ),
-      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
-      clipRule: presentationAttributes.clipRule,
-      fill,
-      fillRule: presentationAttributes.fillRule,
-      stroke:
-        presentationAttributes.stroke &&
-        presentationAttributes.stroke !== 'none'
-          ? color(presentationAttributes.stroke)
-          : undefined,
-      strokeWidth: presentationAttributes.strokeWidth,
-      strokeLineJoin: presentationAttributes.strokeLineJoin,
-      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
-      strokeDashArray: presentationAttributes.strokeDashArray,
-      strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: parseFloat(presentationAttributes.opacity),
-      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
-      mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
+      mask: mask(state.defs, attr.mask),
+      filter: filter(state.defs, attr.filter),
+      clipPath: clipPath(state.defs, attr.clipPath),
+      clipRule: attr.clipRule,
+      fill: color(state.defs, attr.fill, {
+        type: ColorTypes.RGB,
+        red: 0,
+        green: 0,
+        blue: 0,
+      } as RGB),
+      fillRule: attr.fillRule,
+      fillOpacity: opacity(attr.fillOpacity, attr.opacity),
+      stroke: color(state.defs, attr.stroke),
+      strokeWidth: attr.strokeWidth,
+      strokeLineJoin: attr.strokeLineJoin,
+      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
+      strokeLineCap: attr.strokeLineCap,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: parseFloat(attr.strokeDashOffset),
+      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
+      mixBlendMode: mixBlendMode(attr.mixBlendMode),
       transform: transform(props.transform),
     } as Shape);
   },
 
-  /**
-   *
-   * @param props
-   * @param _
-   * @param state
-   * @returns
-   */
-  rect(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
-    const presentationAttributes = hierarchy(
-      props,
-      state.internalCSS,
-      props.style ? props.style : {},
-    );
+  feBlend() {
+    throw new Error('Unsupported or not yet supported element, feBlend');
+  },
 
-    let fill: Color | undefined;
-    if (presentationAttributes.fill) {
-      if (presentationAttributes.fill !== 'none') {
-        fill = color(presentationAttributes.fill);
-      } else {
-        fill = undefined;
+  feColorMatrix() {
+    throw new Error('Unsupported or not yet supported element, feColorMatrix');
+  },
+
+  feComponentTransfer() {
+    throw new Error(
+      'Unsupported or not yet supported element, feComponentTransfer',
+    );
+  },
+
+  feComposite() {
+    throw new Error('Unsupported or not yet supported element, feComposite');
+  },
+
+  feConvolveMatrix() {
+    throw new Error(
+      'Unsupported or not yet supported element, feConvolveMatrix',
+    );
+  },
+
+  feDiffuseLighting() {
+    throw new Error(
+      'Unsupported or not yet supported element, feDiffuseLighting',
+    );
+  },
+
+  feDisplacementMap() {
+    throw new Error(
+      'Unsupported or not yet supported element, feDisplacementMap',
+    );
+  },
+
+  feDistantLight() {
+    throw new Error('Unsupported or not yet supported element, feDistantLight');
+  },
+
+  feDropShadow() {
+    throw new Error('Unsupported or not yet supported element, feDropShadow');
+  },
+
+  feFlood() {
+    throw new Error('Unsupported or not yet supported element, feFlood');
+  },
+
+  feFuncA() {
+    throw new Error('Unsupported or not yet supported element, feFuncA');
+  },
+
+  feFuncB() {
+    throw new Error('Unsupported or not yet supported element, feFuncB');
+  },
+
+  feFuncG() {
+    throw new Error('Unsupported or not yet supported element, feFuncG');
+  },
+
+  feFuncR() {
+    throw new Error('Unsupported or not yet supported element, feFuncR');
+  },
+
+  feGaussianBlur() {
+    throw new Error('Unsupported or not yet supported element, feGaussianBlur');
+  },
+
+  feImage() {
+    throw new Error('Unsupported or not yet supported element, feImage');
+  },
+
+  feMerge() {
+    throw new Error('Unsupported or not yet supported element, feMerge');
+  },
+
+  feMergeNode() {
+    throw new Error('Unsupported or not yet supported element, feMergeNode');
+  },
+
+  feMorphology() {
+    throw new Error('Unsupported or not yet supported element, feMorphology');
+  },
+
+  feOffset() {
+    throw new Error('Unsupported or not yet supported element, feOffset');
+  },
+
+  fePointLight() {
+    throw new Error('Unsupported or not yet supported element, fePointLight');
+  },
+
+  feSpecularLighting() {
+    throw new Error(
+      'Unsupported or not yet supported element, feSpecularLighting',
+    );
+  },
+
+  feSpotLight() {
+    throw new Error('Unsupported or not yet supported element, feSpotLight');
+  },
+
+  feTile() {
+    throw new Error('Unsupported or not yet supported element, feTile');
+  },
+
+  feTurbulence() {
+    throw new Error('Unsupported or not yet supported element, feTurbulence');
+  },
+
+  async filter(props: any, doc: PDFDocument, state: PDFGraphicState) {
+    const children: (PDFGraphic | undefined)[] = [];
+    for (const child of React.Children.toArray(props.children)) {
+      if (
+        typeof child === 'string' ||
+        typeof child === 'number' ||
+        !('type' in child)
+      ) {
+        // TODO: figure out if these cases are applicable
+        continue;
       }
-    } else {
-      fill = { type: ColorTypes.RGB, red: 0, green: 0, blue: 0 };
+
+      const tagName = child.type.toString();
+      if (typeof this[tagName] === 'function') {
+        children.push(
+          (await this[tagName](child.props, doc, state)) as PDFGraphic,
+        );
+      }
+    }
+
+    state.defs['#' + props.id] = {
+      x: parseFloat(props.x),
+      y: parseFloat(props.y),
+      width: parseFloat(props.width),
+      height: parseFloat(props.height),
+      filterUnits: props.filterUnits,
+      primitiveUnits: props.primitiveUnits,
+      effects: children.filter(Boolean) as PDFGraphic[],
+    };
+
+    throw new Error('Unsupported or not yet supported element, filter');
+  },
+
+  async g(
+    props: any,
+    doc: PDFDocument,
+    state: PDFGraphicState,
+  ): Promise<Group> {
+    const attr = attributes(props, state.internalCSS, props.style);
+
+    const children: (PDFGraphic | undefined)[] = [];
+    for (const child of React.Children.toArray(props.children)) {
+      if (
+        typeof child === 'string' ||
+        typeof child === 'number' ||
+        !('type' in child)
+      ) {
+        // TODO: figure out if these case are applicable
+        continue;
+      }
+
+      const tagName = child.type.toString();
+      if (typeof this[tagName] === 'function') {
+        children.push(
+          (await this[tagName](child.props, doc, state)) as PDFGraphic,
+        );
+      }
     }
 
     return removeUndefined({
-      type: 'shape',
-      operators: rect(
-        parseFloat(props.x),
-        parseFloat(props.y),
-        parseFloat(props.width),
-        parseFloat(props.height),
-        props.rx ? parseFloat(props.rx) : undefined,
-        props.ry ? parseFloat(props.ry) : undefined,
-      ),
-      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
-      clipRule: presentationAttributes.clipRule,
-      fill,
-      fillRule: presentationAttributes.fillRule,
-      stroke:
-        presentationAttributes.stroke &&
-        presentationAttributes.stroke !== 'none'
-          ? color(presentationAttributes.stroke)
-          : undefined,
-      strokeWidth: presentationAttributes.strokeWidth,
-      strokeLineJoin: presentationAttributes.strokeLineJoin,
-      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
-      strokeDashArray: presentationAttributes.strokeDashArray,
-      strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: parseFloat(presentationAttributes.opacity),
-      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
-      mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
+      type: 'group',
+      mask: mask(state.defs, attr.mask),
+      filter: filter(state.defs, attr.filter),
+      clipPath: clipPath(state.defs, attr.clipPath),
+      clipRule: attr.clipRule,
+      fill: color(state.defs, attr.fill),
+      fillRule: attr.fillRule,
+      fillOpacity: parseFloat(attr.fillOpacity),
+      stroke: color(state.defs, attr.stroke),
+      strokeWidth: attr.strokeWidth,
+      strokeLineJoin: attr.strokeLineJoin,
+      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
+      strokeLineCap: attr.strokeLineCap,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: parseFloat(attr.strokeDashOffset),
+      strokeOpacity: parseFloat(attr.strokeOpacity),
+      mixBlendMode: mixBlendMode(attr.mixBlendMode),
       transform: transform(props.transform),
-    } as Shape);
+      children: children.filter(Boolean) as PDFGraphic[],
+    } as Group);
   },
 
-  /**
-   *
-   * @param props
-   * @param _
-   * @param state
-   * @returns
-   */
-  line(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
-    const presentationAttributes = hierarchy(
-      props,
-      state.internalCSS,
-      props.style ? props.style : {},
-    );
-
-    return removeUndefined({
-      type: 'shape',
-      operators: line(
-        parseFloat(props.x1),
-        parseFloat(props.y1),
-        parseFloat(props.x2),
-        parseFloat(props.y2),
-      ),
-      clipPath: clipPath(state.defs, presentationAttributes.clipPath),
-      clipRule: presentationAttributes.clipRule,
-      stroke:
-        presentationAttributes.stroke &&
-        presentationAttributes.stroke !== 'none'
-          ? color(presentationAttributes.stroke)
-          : undefined,
-      strokeWidth: presentationAttributes.strokeWidth,
-      strokeLineJoin: presentationAttributes.strokeLineJoin,
-      strokeMiterLimit: parseFloat(presentationAttributes.strokeMiterLimit),
-      strokeDashArray: presentationAttributes.strokeDashArray,
-      strokeDashOffset: presentationAttributes.strokeDashOffset,
-      opacity: parseFloat(presentationAttributes.opacity),
-      strokeOpacity: parseFloat(presentationAttributes.strokeOpacity),
-      mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
-      transform: transform(props.transform),
-    } as Shape);
-  },
-
-  /**
-   *
-   * @param props
-   * @param doc
-   * @param state
-   */
-  defs(props: any, doc: PDFDocument, state: PDFGraphicState): void {
-    const children = React.Children.toArray(props.children);
-    children.forEach((child: any) => {
-      try {
-        this[child.type](child.props, doc, state);
-      } catch (err) {
-        throw new Error('Unsupported or not yet supported tag, ' + child.type);
-      }
-    });
-  },
-
-  /**
-   *
-   * @param props
-   * @param _
-   * @param state
-   */
-  style(props: any, _: PDFDocument, state: PDFGraphicState): void {
-    const innerHTML = props.dangerouslySetInnerHTML.__html;
-    const regCls = /.(.*?){(.*?)}/g;
-    let cls;
-    while ((cls = regCls.exec(innerHTML))) {
-      const names = cls[1].split(',.');
-      for (const name of names) {
-        const styles = cls[2];
-
-        if (!(name in state.internalCSS)) {
-          state.internalCSS[name] = {};
-        }
-
-        styles.split(';').map((style) => {
-          const [key, value] = style.split(':');
-          state.internalCSS[name][camel(key)] = value;
-        });
-      }
-    }
-  },
-
-  /**
-   *
-   * @param props
-   * @param doc
-   * @param state
-   * @returns
-   */
   async image(
     props: any,
     doc: PDFDocument,
     state: PDFGraphicState,
   ): Promise<Image> {
-    const presentationAttributes = hierarchy(
-      props,
-      state.internalCSS,
-      props.style,
-    );
-
-    if (props['xlink:href']) {
-      props.href = props['xlink:href']; // shouldn't be using this anyway so should be okay with performance hit
-    }
+    const attr = attributes(props, state.internalCSS, props.style);
 
     // const res = await axios.get(new URL(props.href), {
     //   responseType: 'text',
@@ -765,10 +642,12 @@ export const JSXParsers: {
           image: png,
           width: parseFloat(props.width),
           height: parseFloat(props.height),
-          clipPath: clipPath(state.defs, presentationAttributes.clipPath),
-          clipRule: presentationAttributes.clipRule,
-          opacity: parseFloat(presentationAttributes.opacity),
-          mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
+          mask: mask(state.defs, attr.mask),
+          filter: filter(state.defs, attr.filter),
+          clipPath: clipPath(state.defs, attr.clipPath),
+          clipRule: attr.clipRule,
+          opacity: parseFloat(attr.opacity),
+          mixBlendMode: mixBlendMode(attr.mixBlendMode),
           transform: transform(props.transform),
         } as Image);
 
@@ -780,16 +659,20 @@ export const JSXParsers: {
           image: jpeg,
           width: parseFloat(props.width),
           height: parseFloat(props.height),
-          clipPath: clipPath(state.defs, presentationAttributes.clipPath),
-          clipRule: presentationAttributes.clipRule,
-          opacity: parseFloat(presentationAttributes.opacity),
-          mixBlendMode: mixBlendMode(presentationAttributes.mixBlendMode),
+          mask: mask(state.defs, attr.mask),
+          filter: filter(state.defs, attr.filter),
+          clipPath: clipPath(state.defs, attr.clipPath),
+          clipRule: attr.clipRule,
+          opacity: parseFloat(attr.opacity),
+          mixBlendMode: mixBlendMode(attr.mixBlendMode),
           transform: transform(props.transform),
         } as Image);
 
       // TODO: Image svg support may be added if a means (to pass a data uri to a string and then) to pass valid jsx is added to dependencies
-
       // This is not something willing to do at this time, but it would look like below
+
+      // import { Buffer } from 'buffer';
+      // import HtmlReactParser from 'html-react-parser';
 
       //   case 'image/svg+xml':
       //     let string = props.href;
@@ -822,11 +705,35 @@ export const JSXParsers: {
     }
   },
 
-  async clipPath(
-    props: any,
-    doc: PDFDocument,
-    state: PDFGraphicState,
-  ): Promise<void> {
+  line(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
+    const attr = attributes(props, state.internalCSS, props.style);
+
+    return removeUndefined({
+      type: 'shape',
+      operators: line(
+        parseFloat(props.x1),
+        parseFloat(props.y1),
+        parseFloat(props.x2),
+        parseFloat(props.y2),
+      ),
+      mask: mask(state.defs, attr.mask),
+      filter: filter(state.defs, attr.filter),
+      clipPath: clipPath(state.defs, attr.clipPath),
+      clipRule: attr.clipRule,
+      stroke: color(state.defs, attr.stroke),
+      strokeWidth: attr.strokeWidth,
+      strokeLineJoin: attr.strokeLineJoin,
+      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
+      strokeLineCap: attr.strokeLineCap,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: parseFloat(attr.strokeDashOffset),
+      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
+      mixBlendMode: mixBlendMode(attr.mixBlendMode),
+      transform: transform(props.transform),
+    } as Shape);
+  },
+
+  async linearGradient(props: any, doc: PDFDocument, state: PDFGraphicState) {
     const children: (PDFGraphic | undefined)[] = [];
     for (const child of React.Children.toArray(props.children)) {
       if (
@@ -846,30 +753,396 @@ export const JSXParsers: {
       }
     }
 
-    state.defs['#' + props.id] = shape({
+    state.defs['#' + props.id] = removeUndefined({
+      x1: parseFloat(props.x1),
+      y1: parseFloat(props.y1),
+      x2: parseFloat(props.x2),
+      y2: parseFloat(props.y2),
+      gradientUnits: props.gradientUnits,
+      gradientTransform: props.gradientTransform,
+      spreadMethod: props.spreadMethod,
+      stops: children.filter(Boolean) as PDFGraphic[],
+    } as LinearGradient);
+  },
+
+  marker() {
+    throw new Error('Unsupported or not yet supported element, marker');
+  },
+
+  async mask(props: any, doc: PDFDocument, state: PDFGraphicState) {
+    const children: (PDFGraphic | undefined)[] = [];
+    for (const child of React.Children.toArray(props.children)) {
+      if (
+        typeof child === 'string' ||
+        typeof child === 'number' ||
+        !('type' in child)
+      ) {
+        // TODO: figure out if these cases are applicable
+        continue;
+      }
+
+      const tagName = child.type.toString();
+      if (typeof this[tagName] === 'function') {
+        children.push(
+          (await this[tagName](child.props, doc, state)) as PDFGraphic,
+        );
+      }
+    }
+
+    state.defs['#' + props.id] = {
+      x: parseFloat(props.x),
+      y: parseFloat(props.y),
+      width: parseFloat(props.width),
+      height: parseFloat(props.height),
+      maskContentUnits: props.maskContentUnits,
+      maskUnits: props.maskUnits,
+      operators: shape({
+        type: 'group',
+        children: children.filter(Boolean) as PDFGraphic[],
+      }),
+    };
+
+    throw new Error('Unsupported or not yet supported element, mask'); //
+  },
+
+  metadata() {
+    throw new Error('Unsupported or not yet supported element, metadata');
+  },
+
+  path(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
+    const attr = attributes(props, state.internalCSS, props.style);
+
+    return removeUndefined({
+      type: 'shape',
+      operators: path(props.d),
+      mask: mask(state.defs, attr.mask),
+      filter: filter(state.defs, attr.filter),
+      clipPath: clipPath(state.defs, attr.clipPath),
+      clipRule: attr.clipRule,
+      fill: color(state.defs, attr.fill, {
+        type: ColorTypes.RGB,
+        red: 0,
+        green: 0,
+        blue: 0,
+      } as RGB),
+      fillRule: attr.fillRule,
+      stroke: color(state.defs, attr.stroke),
+      strokeWidth: attr.strokeWidth,
+      strokeLineJoin: attr.strokeLineJoin,
+      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
+      strokeLineCap: attr.strokeLineCap,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: parseFloat(attr.strokeDashOffset),
+      fillOpacity: opacity(attr.fillOpacity, attr.opacity),
+      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
+      mixBlendMode: mixBlendMode(attr.mixBlendMode),
+      transform: transform(props.transform),
+    } as Shape);
+  },
+
+  pattern() {
+    throw new Error('Unsupported or not yet supported element, pattern');
+  },
+
+  polygon(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
+    const attr = attributes(props, state.internalCSS, props.style);
+
+    return removeUndefined({
+      type: 'shape',
+      operators: polygon(props.points),
+      mask: mask(state.defs, attr.mask),
+      filter: filter(state.defs, attr.filter),
+      clipPath: clipPath(state.defs, attr.clipPath),
+      clipRule: attr.clipRule,
+      fill: color(state.defs, attr.fill, {
+        type: ColorTypes.RGB,
+        red: 0,
+        green: 0,
+        blue: 0,
+      } as RGB),
+      fillRule: attr.fillRule,
+      fillOpacity: opacity(attr.fillOpacity, attr.opacity),
+      stroke: color(state.defs, attr.stroke),
+      strokeWidth: attr.strokeWidth,
+      strokeLineJoin: attr.strokeLineJoin,
+      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
+      strokeLineCap: attr.strokeLineCap,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: parseFloat(attr.strokeDashOffset),
+      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
+      mixBlendMode: mixBlendMode(attr.mixBlendMode),
+      transform: transform(props.transform),
+    } as Shape);
+  },
+
+  polyline(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
+    const attr = attributes(props, state.internalCSS, props.style);
+
+    return removeUndefined({
+      type: 'shape',
+      operators: polyline(props.points),
+      mask: mask(state.defs, attr.mask),
+      filter: filter(state.defs, attr.filter),
+      clipPath: clipPath(state.defs, attr.clipPath),
+      clipRule: attr.clipRule,
+      stroke: color(state.defs, attr.stroke),
+      strokeWidth: attr.strokeWidth,
+      strokeLineJoin: attr.strokeLineJoin,
+      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
+      strokeLineCap: attr.strokeLineCap,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: parseFloat(attr.strokeDashOffset),
+      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
+      mixBlendMode: mixBlendMode(attr.mixBlendMode),
+      transform: transform(props.transform),
+    } as Shape);
+  },
+
+  async radialGradient(props: any, doc: PDFDocument, state: PDFGraphicState) {
+    const children: (PDFGraphic | undefined)[] = [];
+    for (const child of React.Children.toArray(props.children)) {
+      if (
+        typeof child === 'string' ||
+        typeof child === 'number' ||
+        !('type' in child)
+      ) {
+        // TODO: figure out if these cases are applicable
+        continue;
+      }
+
+      const tagName = child.type.toString();
+      if (typeof this[tagName] === 'function') {
+        children.push(
+          (await this[tagName](child.props, doc, state)) as PDFGraphic,
+        );
+      }
+    }
+
+    state.defs['#' + props.id] = removeUndefined({
+      cx: parseFloat(props.cx),
+      cy: parseFloat(props.cy),
+      r: parseFloat(props.r),
+      fx: parseFloat(props.f2),
+      fy: parseFloat(props.fy),
+      fr: parseFloat(props.fr),
+      gradientUnits: props.gradientUnits,
+      gradientTransform: props.gradientTransform,
+      spreadMethod: props.spreadMethod,
+      stops: children.filter(Boolean) as PDFGraphic[],
+    } as RadialGradient);
+  },
+
+  rect(props: any, _: PDFDocument, state: PDFGraphicState): Shape {
+    const attr = attributes(props, state.internalCSS, props.style);
+
+    return removeUndefined({
+      type: 'shape',
+      operators: rect(
+        parseFloat(props.x),
+        parseFloat(props.y),
+        parseFloat(props.width),
+        parseFloat(props.height),
+        props.rx ? parseFloat(props.rx) : undefined,
+        props.ry ? parseFloat(props.ry) : undefined,
+      ),
+      mask: mask(state.defs, attr.mask),
+      filter: filter(state.defs, attr.filter),
+      clipPath: clipPath(state.defs, attr.clipPath),
+      clipRule: attr.clipRule,
+      fill: color(state.defs, attr.fill, {
+        type: ColorTypes.RGB,
+        red: 0,
+        green: 0,
+        blue: 0,
+      } as RGB),
+      fillRule: attr.fillRule,
+      fillOpacity: opacity(attr.fillOpacity, attr.opacity),
+      stroke: color(state.defs, attr.stroke),
+      strokeWidth: attr.strokeWidth,
+      strokeLineJoin: attr.strokeLineJoin,
+      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
+      strokeLineCap: attr.strokeLineCap,
+      strokeDashArray: attr.strokeDashArray,
+      strokeDashOffset: parseFloat(attr.strokeDashOffset),
+      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
+      mixBlendMode: mixBlendMode(attr.mixBlendMode),
+      transform: transform(props.transform),
+    } as Shape);
+  },
+
+  stop() {
+    throw new Error('Unsupported or not yet supported element, stop');
+  },
+
+  style(props: any, _: PDFDocument, state: PDFGraphicState): void {
+    // TODO: make this quicker as large amount of internal CSS is slow
+    // TODO: add tag name support
+
+    const innerHTML = props.dangerouslySetInnerHTML.__html;
+    const regCls = /.(.*?){(.*?)}/g;
+    let cls;
+    while ((cls = regCls.exec(innerHTML))) {
+      const names = cls[1].split(',.');
+      for (const name of names) {
+        const styles = cls[2];
+
+        if (!(name in state.internalCSS)) {
+          state.internalCSS[name] = {};
+        }
+
+        styles.split(';').map((style) => {
+          const [key, value] = style.split(':');
+          state.internalCSS[name][camel(key)] = value;
+        });
+      }
+    }
+  },
+
+  async svg(
+    props: any,
+    doc: PDFDocument,
+    state: PDFGraphicState,
+  ): Promise<Group> {
+    const attr = attributes(props, state.internalCSS, props.style);
+
+    const children: (PDFGraphic | undefined)[] = [];
+    for (const child of React.Children.toArray(props.children)) {
+      if (
+        typeof child === 'string' ||
+        typeof child === 'number' ||
+        !('type' in child)
+      ) {
+        // TODO: figure out if these case are applicable
+        continue;
+      }
+
+      const tagName = child.type.toString();
+      if (typeof this[tagName] === 'function') {
+        children.push(
+          (await this[tagName](child.props, doc, state)) as PDFGraphic,
+        );
+      }
+    }
+
+    return removeUndefined({
       type: 'group',
+      mask: mask(state.defs, attr.mask),
+      filter: filter(state.defs, attr.filter),
+      clipPath: clipPath(state.defs, attr.clipPath),
+      clipRule: attr.clipRule,
+      fillOpacity: opacity(attr.fillOpacity, attr.opacity),
+      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
+      mixBlendMode: mixBlendMode(attr.mixBlendMode),
+      transform: transform(props.transform),
       children: children.filter(Boolean) as PDFGraphic[],
-    });
+    } as Group);
   },
 
-  text(props: any, _: PDFDocument, state: PDFGraphicState): Text {
-    const presentationAttributes = hierarchy(
-      props,
-      state.internalCSS,
-      props.style,
-    );
-
-    console.log(presentationAttributes);
-    // let children = React.Children.toArray(props.children);
-    return removeUndefined({ type: 'text', value: '' } as Text);
+  switch() {
+    throw new Error('Unsupported or not yet supported element, stop');
   },
 
-  tspan(props: any, _: PDFDocument, __: PDFGraphicState) {
-    // const presentationAttributes = hierarchy(
+  symbol() {
+    throw new Error('Unsupported or not yet supported element, symbol');
+  },
+
+  async text(
+    props: any,
+    doc: PDFDocument,
+    state: PDFGraphicState,
+  ): Promise<Text> {
+    // const attr = attributes(
     //   props,
     //   state.internalCSS,
     //   props.style,
     // );
-    if (props) return;
+
+    const children: (PDFGraphic | undefined)[] = [];
+    for (const child of React.Children.toArray(props.children)) {
+      if (
+        typeof child === 'string' ||
+        typeof child === 'number' ||
+        !('type' in child)
+      ) {
+        // TODO: figure out if these case are applicable
+        continue;
+      }
+
+      const tagName = child.type.toString();
+      if (typeof this[tagName] === 'function') {
+        children.push(
+          (await this[tagName](child.props, doc, state)) as PDFGraphic,
+        );
+      }
+    }
+
+    return removeUndefined({
+      type: 'text',
+      children: children.filter(Boolean) as Text[],
+    } as Text);
+  },
+
+  async textPath() {
+    throw new Error('Unsupported or not yet supported element, textPath');
+  },
+
+  title() {
+    throw new Error('Unsupported or not yet supported element, title');
+  },
+
+  async tspan(
+    props: any,
+    doc: PDFDocument,
+    state: PDFGraphicState,
+  ): Promise<Text> {
+    // const attr = attributes(
+    //   props,
+    //   state.internalCSS,
+    //   props.style,
+    // );
+
+    const children: (PDFGraphic | undefined)[] = [];
+    for (const child of React.Children.toArray(props.children)) {
+      if (
+        typeof child === 'string' ||
+        typeof child === 'number' ||
+        !('type' in child)
+      ) {
+        // TODO: figure out if these case are applicable
+        continue;
+      }
+
+      const tagName = child.type.toString();
+      if (typeof this[tagName] === 'function') {
+        children.push(
+          (await this[tagName](child.props, doc, state)) as PDFGraphic,
+        );
+      }
+    }
+
+    return removeUndefined({
+      type: 'text',
+      children: children.filter(Boolean) as Text[],
+    } as Text);
+  },
+
+  unknown() {
+    throw new Error('Unsupported or not yet supported element, unknown');
+  },
+
+  async use() {
+    throw new Error('Unsupported or not yet supported element, use');
+  },
+
+  view() {
+    throw new Error('Unsupported element, view');
+  },
+
+  ['Symbol(react.fragment)'](
+    props: any,
+    doc: PDFDocument,
+    state: PDFGraphicState,
+  ) {
+    return this.g(props, doc, state); // SVG 2 spec treats all non SVG elements as g
   },
 };

@@ -10,7 +10,7 @@ import PDFFont from 'src/api/PDFFont';
 import PDFImage from 'src/api/PDFImage';
 import PDFPage from 'src/api/PDFPage';
 import PDFForm from 'src/api/form/PDFForm';
-import PDFGraphic, { JSXParsers, PDFGraphicState } from 'src/api/PDFGraphic';
+import { JSXParsers, PDFGraphicState } from 'src/api/PDFGraphic';
 import { PageSizes } from 'src/api/sizes';
 import { StandardFonts } from 'src/api/StandardFonts';
 import {
@@ -1234,7 +1234,7 @@ export default class PDFDocument {
     return embeddedPages;
   }
 
-  async parseJsx(jsx: React.ReactElement): Promise<PDFGraphic> {
+  async parseJsx(jsx: React.ReactElement) {
     const tagName = jsx.type.toString();
 
     if (typeof JSXParsers[tagName] !== 'function') {
@@ -1246,7 +1246,7 @@ export default class PDFDocument {
     }
 
     const state = new PDFGraphicState();
-    return (await JSXParsers[tagName](jsx.props, this, state)) as PDFGraphic;
+    return await JSXParsers[tagName](jsx.props, this, state);
   }
 
   /**
