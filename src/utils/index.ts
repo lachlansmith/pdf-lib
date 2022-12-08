@@ -8,4 +8,5 @@ export * from 'src/utils/base64';
 export * from 'src/utils/objects';
 export * from 'src/utils/validators';
 export * from 'src/utils/pdfDocEncoding';
+export * from 'src/utils/attributes';
 export { default as Cache } from 'src/utils/Cache';

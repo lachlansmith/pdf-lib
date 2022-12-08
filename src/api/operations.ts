@@ -38,6 +38,7 @@ import { asNumber } from 'src/api/objects';
 import { translate, scale } from 'src/api/transform';
 import { Shape, Text, Image, Group } from 'src/api/JSXParser';
 import PDFPage from 'src/api/PDFPage';
+import { breakTextIntoLines, cleanText, lineSplit } from 'src/utils';
 
 export interface DrawTextOptions {
   color: Color;
@@ -883,7 +884,52 @@ export const drawGraphic = (
       break;
 
     case 'text':
-      // TODO: add support for text
+      if (g.mixBlendMode || g.fillOpacity || g.strokeOpacity) {
+        const graphicsState = page.doc.context.obj({
+          Type: 'ExtGState',
+          ca: g.fillOpacity,
+          CA: g.strokeOpacity,
+          BM: g.mixBlendMode,
+        });
+
+        const GState = page.node.newExtGState('GS', graphicsState);
+        ops.push(setGraphicsState(GState));
+      }
+
+      const wordBreaks = g.wordBreaks || page.doc.defaultWordBreaks;
+      const textWidth = (t: string) => g.font.widthOfTextAtSize(t, g.fontSize);
+      const lines =
+        g.maxWidth === undefined
+          ? lineSplit(cleanText(g.text))
+          : breakTextIntoLines(g.text, wordBreaks, g.maxWidth, textWidth);
+
+      const encodedLines = new Array(lines.length) as PDFHexString[];
+      for (let idx = 0, len = lines.length; idx < len; idx++) {
+        encodedLines[idx] = g.font.encodeText(lines[idx]);
+      }
+
+      const font = page.node.newFontDictionary(g.font.name, g.font.ref);
+
+      ops.push(
+        beginText(),
+        setFillingColor(g.fill),
+        setFontAndSize(font, g.fontSize),
+        setLineHeight(g.lineHeight),
+        // rotateAndSkewTextRadiansAndTranslate(
+        //   toRadians(options.rotate),
+        //   toRadians(options.xSkew),
+        //   toRadians(options.ySkew),
+        //   options.x,
+        //   options.y,
+        // ),
+      );
+
+      for (let idx = 0, len = encodedLines.length; idx < len; idx++) {
+        ops.push(showText(encodedLines[idx]), nextLine());
+      }
+
+      ops.push(endText(), popGraphicsState());
+
       break;
 
     case 'image':

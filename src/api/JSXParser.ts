@@ -1,5 +1,4 @@
 import React from 'react';
-import ColorParser from 'color';
 import CssParser from 'clean-css';
 import fontkit from '@pdf-lib/fontkit';
 import PDFFont from 'src/api/PDFFont';
@@ -27,6 +26,18 @@ import {
   SVGParserNotFoundError,
   SVGParserUnsupportedImageError,
 } from 'src/core';
+import {
+  definedKeysOf,
+  attributes,
+  font,
+  mixBlendMode,
+  mask,
+  filter,
+  clipPath,
+  color,
+  opacity,
+  camel,
+} from 'src/utils';
 
 export const HTMLReactParserOptions = {
   htmlparser2: {
@@ -34,13 +45,7 @@ export const HTMLReactParserOptions = {
   },
 };
 
-export const viewBox = (viewBox: string) => {
-  const [x0, y0, x1, y1] = viewBox.split(' ').map((coord) => parseFloat(coord));
-
-  return [x1 - x0, y1 - y0] as [number, number];
-};
-
-interface Mask {
+export interface Mask {
   x?: number;
   y?: number;
   width?: number;
@@ -50,7 +55,7 @@ interface Mask {
   operators: PDFOperator[];
 }
 
-interface Filter {
+export interface Filter {
   x?: number;
   y?: number;
   width?: number;
@@ -60,14 +65,14 @@ interface Filter {
   effects: Effect[];
 }
 
-interface Effect {}
+export interface Effect {}
 
-interface ClipPath {
+export interface ClipPath {
   clipPathUnits: 'userSpaceOnUse' | 'objectBoundingBox';
   operators: PDFOperator[];
 }
 
-interface LinearGradient {
+export interface LinearGradient {
   x1?: number;
   y1?: number;
   x2: number;
@@ -78,7 +83,7 @@ interface LinearGradient {
   stops: Stop[];
 }
 
-interface RadialGradient {
+export interface RadialGradient {
   cx?: number;
   cy?: number;
   r?: number;
@@ -91,16 +96,11 @@ interface RadialGradient {
   stops: Stop[];
 }
 
-interface Stop {}
+export interface Stop {}
 
 interface Iterator {
   [key: string]: any;
 }
-
-const definedKeysOf = <T extends Iterator>(obj: T): T => {
-  Object.keys(obj).forEach((key) => obj[key] === undefined && delete obj[key]);
-  return obj;
-};
 
 interface Base extends Iterator {
   //   size: [number, number];
@@ -131,7 +131,7 @@ export interface Shape extends Base {
 export interface Text extends Base {
   type: 'text';
   //   value: string;
-  font: PDFFont | StandardFonts;
+  font: PDFFont;
   children?: Text[];
 }
 
@@ -159,147 +159,6 @@ export interface Group extends Base {
   children: (Shape | Text | Image | Group)[];
 }
 
-const camel = (str: string) =>
-  str.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
-
-const attributes = (
-  presentationAttributes: any,
-  internalCss: any,
-  inlineStyle: any,
-) => {
-  // construct styles classes from listed class names
-  let classes = {};
-  if (presentationAttributes.className) {
-    const names = presentationAttributes.className.split(' '); // multiple internal styles
-
-    names.forEach((name: string) => {
-      if (!(name in internalCss)) return;
-      classes = { ...classes, ...internalCss[name] };
-    });
-  }
-
-  return {
-    color: presentationAttributes.color,
-    mask: presentationAttributes.mask,
-    filter: presentationAttributes.filter,
-    clipPath: presentationAttributes.clipPath,
-    clipRule: presentationAttributes.clipRule,
-    fill: presentationAttributes.fill,
-    fileRule: presentationAttributes.fileRule,
-    stroke: presentationAttributes.stroke,
-    strokeWidth: presentationAttributes.strokeWidth,
-    strokeLineJoin: presentationAttributes.strokeLineJoin,
-    strokeMiterLimit: presentationAttributes.strokeMiterLimit,
-    strokeLineCap: presentationAttributes.strokeLineCap,
-    strokeDashArray: presentationAttributes.strokeDashArray,
-    strokeDashOffset: presentationAttributes.strokeDashOffset,
-    strokeOpacity: presentationAttributes.strokeOpacity,
-    fillOpacity: presentationAttributes.fillOpacity,
-    opacity: presentationAttributes.opacity,
-    ...classes,
-    ...(inlineStyle ? inlineStyle : {}),
-  };
-};
-
-const color = (
-  defs: {
-    [id: string]: Mask | Filter | ClipPath | LinearGradient | RadialGradient;
-  },
-  str: string | undefined,
-  color?: Color,
-): Color | LinearGradient | RadialGradient | undefined => {
-  if (str === 'none') return undefined;
-  if (!str) return color;
-  const match = /url\((.*)\)/g.exec(str);
-  if (match) {
-    return defs[match[1]] as LinearGradient | RadialGradient;
-  }
-  const { r, g, b } = ColorParser(str).rgb().object();
-  return {
-    type: ColorTypes.RGB,
-    red: r / 255,
-    green: g / 255,
-    blue: b / 255,
-  } as RGB;
-};
-
-const opacity = (fillOrStrokeOpacity?: string, opacity?: string) => {
-  return fillOrStrokeOpacity
-    ? parseFloat(fillOrStrokeOpacity)
-    : opacity
-    ? parseFloat(opacity)
-    : undefined;
-};
-
-const url = (
-  defs: {
-    [id: string]: Mask | Filter | ClipPath | LinearGradient | RadialGradient;
-  },
-  str?: string,
-) => {
-  if (!str) return undefined;
-
-  const match = /url\((.*)\)/g.exec(str);
-  if (match) {
-    return defs[match[1]] as Mask | Filter | ClipPath;
-  }
-
-  return undefined;
-};
-
-const clipPath = (
-  defs: {
-    [id: string]: Mask | Filter | ClipPath | LinearGradient | RadialGradient;
-  },
-  clipString?: string,
-): ClipPath | undefined => url(defs, clipString) as ClipPath | undefined;
-
-const filter = (
-  defs: {
-    [id: string]: Mask | Filter | ClipPath | LinearGradient | RadialGradient;
-  },
-  filterString?: string,
-): Filter | undefined => url(defs, filterString) as Filter | undefined;
-
-const mask = (
-  defs: {
-    [id: string]: Mask | Filter | ClipPath | LinearGradient | RadialGradient;
-  },
-  maskString?: string,
-): Mask | undefined => url(defs, maskString) as Mask | undefined;
-
-const mixBlendMode = (blendmode?: string): BlendMode | undefined => {
-  if (!blendmode) return undefined;
-  const blendMode = camel(blendmode);
-  return (blendMode.charAt(0).toUpperCase() + blendMode.slice(1)) as BlendMode;
-};
-
-const children = async <T>(
-  children: any,
-  callback: (child: { tagName: keyof Parsers; props: any }) => Promise<T>,
-) => {
-  const texts = [];
-  for (const child of React.Children.toArray(children)) {
-    if (
-      typeof child === 'string' ||
-      typeof child === 'number' ||
-      !('type' in child)
-    ) {
-      // TODO: figure out if these cases are applicable
-      continue;
-    }
-
-    const tagName = child.type.toString() as keyof Parsers;
-    if (typeof parsers[tagName] !== 'function') {
-      throw new SVGParserNotFoundError(tagName);
-    }
-
-    texts.push(await callback({ tagName: tagName, props: child.props }));
-  }
-
-  return texts.filter(Boolean) as Exclude<T, undefined>[];
-};
-
 export class JSXParserState {
   throwOnInvalidElement: boolean;
   css: any;
@@ -326,6 +185,32 @@ export class JSXParserState {
     this.defs = {};
   }
 }
+
+export const children = async <T>(
+  children: any,
+  callback: (child: { tagName: keyof Parsers; props: any }) => Promise<T>,
+) => {
+  const texts = [];
+  for (const child of React.Children.toArray(children)) {
+    if (
+      typeof child === 'string' ||
+      typeof child === 'number' ||
+      !('type' in child)
+    ) {
+      // TODO: figure out if these cases are applicable
+      continue;
+    }
+
+    const tagName = child.type.toString() as keyof Parsers;
+    if (typeof parsers[tagName] !== 'function') {
+      throw new SVGParserNotFoundError(tagName);
+    }
+
+    texts.push(await callback({ tagName: tagName, props: child.props }));
+  }
+
+  return texts.filter(Boolean) as Exclude<T, undefined>[];
+};
 
 type Parsers = typeof parsers;
 
@@ -996,12 +881,12 @@ export const parsers = {
   },
 
   async radialGradient(props: any, doc: PDFDocument, state: JSXParserState) {
+    // this is here until implementation verified
     if (state.throwOnInvalidElement) {
       throw new SVGParserNotSupportedError('radialGradient');
     }
 
     const url = '#' + props.id;
-
     const radialGradient: RadialGradient = {
       cx: parseFloat(props.cx),
       cy: parseFloat(props.cy),
@@ -1193,7 +1078,7 @@ export const parsers = {
     return undefined;
   },
 
-  async text(props: any, _: PDFDocument, state: JSXParserState) {
+  async text(props: any, doc: PDFDocument, state: JSXParserState) {
     const attr = attributes(props, state.css, props.style);
 
     console.log(attr);
@@ -1202,13 +1087,14 @@ export const parsers = {
 
     const text: Text = {
       type: 'text',
-      font: state.fonts[attr.fontFamily]
-        ? state.fonts[attr.fontFamily][
-            attr.fontWeight
-              ? attr.fontWeight
-              : Object.keys(state.fonts[attr.fontFamily])[0]
-          ][attr.fontStyle ? attr.fontStyle : 'normal']
-        : StandardFonts.Helvetica,
+      font: attr.fontFamily
+        ? await font(
+            state.fonts,
+            attr.fontFamily,
+            attr.fontWeight,
+            attr.fontStyle,
+          )
+        : await doc.embedFont(StandardFonts.Helvetica),
       //   children: await children(props.children, async (child) => {
       //     if (child.tagName !== 'tspan' && child.tagName !== 'textPath') {
       //       throw new Error('Invalid SVG');
@@ -1234,13 +1120,14 @@ export const parsers = {
 
     const text: Text = {
       type: 'text',
-      font: state.fonts[attr.fontFamily]
-        ? state.fonts[attr.fontFamily][
-            attr.fontWeight
-              ? attr.fontWeight
-              : Object.keys(state.fonts[attr.fontFamily])[0]
-          ][attr.fontStyle ? attr.fontStyle : 'normal']
-        : StandardFonts.Helvetica,
+      font: attr.fontFamily
+        ? await font(
+            state.fonts,
+            attr.fontFamily,
+            attr.fontWeight,
+            attr.fontStyle,
+          )
+        : await doc.embedFont(StandardFonts.Helvetica),
       children: await children(props.children, async (child) => {
         if (child.tagName !== 'tspan' && child.tagName !== 'textPath') {
           throw new Error('Invalid SVG');
@@ -1268,13 +1155,14 @@ export const parsers = {
 
     const text: Text = {
       type: 'text',
-      font: state.fonts[attr.fontFamily]
-        ? state.fonts[attr.fontFamily][
-            attr.fontWeight
-              ? attr.fontWeight
-              : Object.keys(state.fonts[attr.fontFamily])[0]
-          ][attr.fontStyle ? attr.fontStyle : 'normal']
-        : StandardFonts.Helvetica,
+      font: attr.fontFamily
+        ? await font(
+            state.fonts,
+            attr.fontFamily,
+            attr.fontWeight,
+            attr.fontStyle,
+          )
+        : await doc.embedFont(StandardFonts.Helvetica),
       children: await children(props.children, async (child) => {
         if (child.tagName !== 'tspan' && child.tagName !== 'textPath') {
           throw new Error('Invalid SVG');

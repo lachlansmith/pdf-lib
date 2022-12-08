@@ -66,12 +66,13 @@ import {
   pluckIndices,
   range,
   toUint8Array,
+  viewBox,
 } from 'src/utils';
 import FileEmbedder, { AFRelationship } from 'src/core/embedders/FileEmbedder';
 import PDFEmbeddedFile from 'src/api/PDFEmbeddedFile';
 import PDFJavaScript from 'src/api/PDFJavaScript';
 import JavaScriptEmbedder from 'src/core/embedders/JavaScriptEmbedder';
-import JSXParser, { JSXParserState, viewBox } from 'src/api/JSXParser';
+import JSXParser, { JSXParserState } from 'src/api/JSXParser';
 
 /**
  * Represents a PDF document.

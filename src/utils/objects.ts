@@ -11,3 +11,8 @@ export const rectanglesAreEqual = (
   a: { x: number; y: number; width: number; height: number },
   b: { x: number; y: number; width: number; height: number },
 ) => a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+
+export const definedKeysOf = <T extends { [key: string]: any }>(obj: T): T => {
+  Object.keys(obj).forEach((key) => obj[key] === undefined && delete obj[key]);
+  return obj;
+};

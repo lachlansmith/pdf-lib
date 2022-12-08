@@ -180,3 +180,6 @@ export const findLastMatch = (value: string, regex: RegExp) => {
   }
   return { match: lastMatch, pos: position };
 };
+
+export const camel = (str: string) =>
+  str.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
