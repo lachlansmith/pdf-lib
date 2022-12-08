@@ -732,6 +732,14 @@
   dependencies:
     "@babel/types" "^7.3.0"
 
+"@types/clean-css@^4.2.6":
+  version "4.2.6"
+  resolved "https://registry.yarnpkg.com/@types/clean-css/-/clean-css-4.2.6.tgz#48b427285b2b654751a9bbc6f7d35e6173dec8d2"
+  integrity sha512-Ze1tf+LnGPmG6hBFMi0B4TEB0mhF7EiMM5oyjLDNPE9hxrPU0W+5+bHvO+eFPA+bt0iC1zkQMoU/iGdRVjcRbw==
+  dependencies:
+    "@types/node" "*"
+    source-map "^0.6.0"
+
 "@types/color-convert@*":
   version "2.0.0"
   resolved "https://registry.npmjs.org/@types/color-convert/-/color-convert-2.0.0.tgz"
@@ -1267,6 +1275,13 @@ class-utils@^0.3.5:
     define-property "^0.2.5"
     isobject "^3.0.0"
     static-extend "^0.1.1"
+
+clean-css@^5.3.1:
+  version "5.3.1"
+  resolved "https://registry.yarnpkg.com/clean-css/-/clean-css-5.3.1.tgz#d0610b0b90d125196a2894d35366f734e5d7aa32"
+  integrity sha512-lCr8OHhiWCTw4v8POJovCoh4T7I9U11yVsPjMWWnnMmp9ZowCxyad1Pathle/9HjaDp+fdQKjO9fQydE6RHTZg==
+  dependencies:
+    source-map "~0.6.0"
 
 cliui@^6.0.0:
   version "6.0.0"
@@ -3891,7 +3906,7 @@ source-map@^0.5.0, source-map@^0.5.6:
   resolved "https://registry.npmjs.org/source-map/-/source-map-0.5.7.tgz"
   integrity sha1-igOdLRAh0i0eoUyA2OpGi6LvP8w=
 
-source-map@^0.6.0, source-map@^0.6.1, source-map@~0.6.1:
+source-map@^0.6.0, source-map@^0.6.1, source-map@~0.6.0, source-map@~0.6.1:
   version "0.6.1"
   resolved "https://registry.npmjs.org/source-map/-/source-map-0.6.1.tgz"
   integrity sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==

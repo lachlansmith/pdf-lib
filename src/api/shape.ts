@@ -12,7 +12,7 @@ import {
 } from 'src/api/operators';
 import { translate } from 'src/api/transform';
 import { PDFOperator } from 'src/core';
-import { Shape, Group } from './PDFGraphic';
+import { Shape, Group } from 'src/api/JSXParser';
 
 let cx: number = 0;
 let cy: number = 0;

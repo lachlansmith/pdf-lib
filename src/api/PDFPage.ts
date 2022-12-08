@@ -19,7 +19,7 @@ import PDFDocument from 'src/api/PDFDocument';
 import PDFEmbeddedPage from 'src/api/PDFEmbeddedPage';
 import PDFFont from 'src/api/PDFFont';
 import PDFImage from 'src/api/PDFImage';
-import PDFGraphic from 'src/api/PDFGraphic';
+import { Text, Group, Image, Shape } from 'src/api/JSXParser';
 import {
   PDFPageDrawCircleOptions,
   PDFPageDrawEllipseOptions,
@@ -1533,10 +1533,13 @@ export default class PDFPage {
    * // Draw svg
    * page.drawSvg(svg, { x: 25, y: 75 })
    * ```
-   * @param svg The SVG to be drawn.
+   * @param graphic The graphic to be drawn.
    * @param options The options to be used when drawing the SVG.
    */
-  draw(graphic: PDFGraphic, options: PDFPageDrawOptions = {}): void {
+  draw(
+    graphic: Shape | Text | Image | Group,
+    options: PDFPageDrawOptions = {},
+  ): void {
     assertIs(graphic, 'graphic', [[Object, 'PDFGraphic']]);
     assertOrUndefined(options.x, 'options.x', ['number']);
     assertOrUndefined(options.y, 'options.y', ['number']);

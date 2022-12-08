@@ -30,18 +30,13 @@ import {
   clip,
   endPath,
 } from 'src/api/operators';
-import {
-  Color,
-  //   ColorTypes,
-  setFillingColor,
-  setStrokingColor,
-} from 'src/api/colors';
+import { Color, setFillingColor, setStrokingColor } from 'src/api/colors';
 import { Rotation, degrees, toRadians } from 'src/api/rotations';
 import { path, line, circle, ellipse, rect } from 'src/api/shape';
 import { PDFHexString, PDFName, PDFNumber, PDFOperator } from 'src/core';
 import { asNumber } from 'src/api/objects';
 import { translate, scale } from 'src/api/transform';
-import PDFGraphic from 'src/api/PDFGraphic';
+import { Shape, Text, Image, Group } from 'src/api/JSXParser';
 import PDFPage from 'src/api/PDFPage';
 
 export interface DrawTextOptions {
@@ -374,7 +369,7 @@ export const drawPath = (options: {
   ].filter(Boolean) as PDFOperator[];
 
 export const draw = (
-  graphic: PDFGraphic,
+  graphic: Shape | Text | Image | Group,
   page: PDFPage,
   options: {
     x: number | PDFNumber;
@@ -402,7 +397,7 @@ export const draw = (
     operators.push(endPath());
   }
 
-  const ops = graphicToOperators(graphic, page); // can't use spread operator or will hit max call stack
+  const ops = drawGraphic(graphic, page); // can't use spread operator or will hit max call stack
   ops.forEach((o) => operators.push(o));
 
   operators.push(popGraphicsState());
@@ -816,8 +811,8 @@ export const drawOptionList = (options: {
   ];
 };
 
-export const graphicToOperators = (
-  g: PDFGraphic,
+export const drawGraphic = (
+  g: Shape | Text | Image | Group,
   page: PDFPage,
 ): PDFOperator[] => {
   const ops: (PDFOperator | undefined)[] = [];
@@ -840,8 +835,8 @@ export const graphicToOperators = (
   // draw shape, text or image to graphic state, or continue from groups child graphics
   switch (g.type) {
     case 'group':
-      g.children.forEach((graphic: PDFGraphic) => {
-        const operators = graphicToOperators(graphic, page);
+      g.children.forEach((graphic) => {
+        const operators = drawGraphic(graphic, page);
         operators.forEach((o) => ops.push(o));
       });
       break;
@@ -862,8 +857,8 @@ export const graphicToOperators = (
 
       // apply all presentation attributes and later stripped those undefined
       ops.push(
-        g.fill ? setFillingColor(g.fill) : undefined,
-        g.stroke ? setStrokingColor(g.stroke) : undefined,
+        g.fill ? setFillingColor(g.fill as Color) : undefined,
+        g.stroke ? setStrokingColor(g.stroke as Color) : undefined,
         g.strokeWidth ? setLineWidth(g.strokeWidth) : undefined,
         g.strokeLineJoin ? setLineJoin(g.strokeLineJoin) : undefined, //TODO: untested
         g.strokeMiterLimit ? setLineMiterLimit(g.strokeMiterLimit) : undefined, //TODO: untested

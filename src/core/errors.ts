@@ -219,3 +219,55 @@ export class MissingKeywordError extends PDFParsingError {
     super(pos, msg);
   }
 }
+
+export class SVGParsingError extends Error {
+  constructor(tagName: string, details: string) {
+    const msg = `Failed to parse SVG element (tagName:${tagName}): ${details}`;
+    super(msg);
+  }
+}
+
+export class SVGParserNotFoundError extends SVGParsingError {
+  constructor(tagName: string) {
+    const msg = `Parser not found`;
+    super(tagName, msg);
+  }
+}
+
+export class SVGParserNotSupportedError extends SVGParsingError {
+  constructor(tagName: string) {
+    const msg = `Parser not supported`;
+    super(tagName, msg);
+  }
+}
+
+export class SVGParserFontError extends SVGParsingError {
+  constructor(message: string) {
+    super('style', message);
+  }
+}
+
+export class SVGParserUnsupportedImageError extends SVGParsingError {
+  constructor(mimeType: string) {
+    super(
+      'image',
+      'Unsupported image, ' +
+        mimeType +
+        '. PDFs support image/jpeg or image/png',
+    );
+  }
+}
+
+export class UndefinedReturnError extends Error {
+  constructor(tagName: string) {
+    const msg = `Nothing to draw (tagName:${tagName}): Element returned undefined`;
+    super(msg);
+  }
+}
+
+export class UndefinedViewBoxError extends Error {
+  constructor(tagName: string, index: number) {
+    const msg = `Failed to create PDFDocument from JSX elements (tagName:${tagName} index:${index}): SVG element doesn't have viewBox`;
+    super(msg);
+  }
+}

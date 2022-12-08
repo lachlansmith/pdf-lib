@@ -10,7 +10,6 @@ import PDFFont from 'src/api/PDFFont';
 import PDFImage from 'src/api/PDFImage';
 import PDFPage from 'src/api/PDFPage';
 import PDFForm from 'src/api/form/PDFForm';
-import { JSXParsers, PDFGraphicState } from 'src/api/PDFGraphic';
 import { PageSizes } from 'src/api/sizes';
 import { StandardFonts } from 'src/api/StandardFonts';
 import {
@@ -19,6 +18,7 @@ import {
   JpegEmbedder,
   PageBoundingBox,
   PageEmbeddingMismatchedContextError,
+  SVGParserNotFoundError,
   PDFCatalog,
   PDFContext,
   PDFDict,
@@ -35,6 +35,8 @@ import {
   PngEmbedder,
   StandardFontEmbedder,
   UnexpectedObjectTypeError,
+  UndefinedReturnError,
+  UndefinedViewBoxError,
 } from 'src/core';
 import {
   ParseSpeeds,
@@ -43,8 +45,10 @@ import {
   Base64SaveOptions,
   LoadOptions,
   CreateOptions,
+  FromOptions,
   EmbedFontOptions,
   SetTitleOptions,
+  EmbedJsxOptions,
 } from 'src/api/PDFDocumentOptions';
 import PDFObject from 'src/core/objects/PDFObject';
 import PDFRef from 'src/core/objects/PDFRef';
@@ -67,8 +71,7 @@ import FileEmbedder, { AFRelationship } from 'src/core/embedders/FileEmbedder';
 import PDFEmbeddedFile from 'src/api/PDFEmbeddedFile';
 import PDFJavaScript from 'src/api/PDFJavaScript';
 import JavaScriptEmbedder from 'src/core/embedders/JavaScriptEmbedder';
-// import parseHtml from 'react-html-parser';
-// import { minify as minifyHtml } from 'html-minifier';
+import JSXParser, { JSXParserState, viewBox } from 'src/api/JSXParser';
 
 /**
  * Represents a PDF document.
@@ -167,6 +170,72 @@ export default class PDFDocument {
     context.trailerInfo.Root = context.register(catalog);
 
     return new PDFDocument(context, false, updateMetadata);
+  }
+
+  /**
+   * Create a single page [[PDFDocument]] from JSX.
+   * @param jsx The input DOM in JSX format
+   * @param options The options to be used when drawing the document.
+   * @returns Resolves with a document drawn from DOM input
+   */
+  static async from(
+    elements: JSX.Element | JSX.Element[],
+    options: FromOptions = {},
+  ) {
+    const {
+      updateMetadata = true,
+      throwOnInvalidElement = true,
+      fonts = {},
+    } = options;
+
+    const doc = await PDFDocument.create({ updateMetadata });
+    if (elements instanceof Array) {
+      await Promise.all(
+        elements.map(async (el, index) => {
+          const graphic = await doc.embedJsx(el, {
+            throwOnInvalidElement,
+            fonts,
+          });
+
+          if (!graphic) {
+            throw new UndefinedReturnError(el.type.toString());
+          }
+
+          if (!el.props.viewBox) {
+            throw new UndefinedViewBoxError(el.type.toString(), index);
+          }
+
+          const page = doc.addPage(
+            el.type === 'svg' ? viewBox(el.props.viewBox) : undefined,
+          );
+
+          page.draw(graphic, { x: 0, y: page.getHeight() });
+        }),
+      );
+    } else {
+      const tagName = elements.type.toString();
+
+      const graphic = await doc.embedJsx(elements, {
+        throwOnInvalidElement,
+        fonts,
+      });
+
+      if (!graphic) {
+        throw new UndefinedReturnError(tagName);
+      }
+
+      if (!elements.props.viewBox) {
+        throw new UndefinedViewBoxError(tagName, 0);
+      }
+
+      const page = doc.addPage(
+        tagName === 'svg' ? viewBox(elements.props.viewBox) : undefined,
+      );
+
+      page.draw(graphic, { x: 0, y: page.getHeight() });
+    }
+
+    return doc;
   }
 
   /** The low-level context of this document. */
@@ -1234,19 +1303,25 @@ export default class PDFDocument {
     return embeddedPages;
   }
 
-  async parseJsx(jsx: React.ReactElement) {
-    const tagName = jsx.type.toString();
+  /**
+   * Parse and embed SVG elements as drawable graphics into this document. The input data is provided in JSX format
+   *
+   * For example:
+   * ```js
+   * ```
+   *
+   * @param jsx The input DOM for a JSX element.
+   * @returns Resolves with the embedded graphics to draw.
+   */
+  async embedJsx(element: JSX.Element, options: EmbedJsxOptions = {}) {
+    const tagName = element.type.toString() as keyof typeof JSXParser;
 
-    if (typeof JSXParsers[tagName] !== 'function') {
-      throw new Error(
-        'Parser for JSX ' +
-          tagName +
-          ' element not supported, or not yet supported',
-      );
+    if (typeof JSXParser[tagName] !== 'function') {
+      throw new SVGParserNotFoundError(tagName);
     }
 
-    const state = new PDFGraphicState();
-    return await JSXParsers[tagName](jsx.props, this, state);
+    const state = new JSXParserState(options);
+    return await JSXParser[tagName](element.props, this, state);
   }
 
   /**

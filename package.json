@@ -30,7 +30,6 @@
     "Brent McSharry (https://github.com/mcshaz)",
     "Tim Knapp (https://github.com/duffyd)",
     "Ching Chang (https://github.com/ChingChang9)",
-    "François Billioud (https://github.com/Sharcoux)",
     "Lachlan Smith (https://github.com/lachlansmith)"
   ],
   "scripts": {
@@ -92,6 +91,7 @@
   "dependencies": {
     "@pdf-lib/standard-fonts": "^1.0.0",
     "@pdf-lib/upng": "^1.0.1",
+    "clean-css": "^5.3.1",
     "color": "^4.2.3",
     "pako": "^1.0.11",
     "react": "^18.2.0",
@@ -102,6 +102,7 @@
     "@rollup/plugin-commonjs": "^13.0.0",
     "@rollup/plugin-json": "^4.1.0",
     "@rollup/plugin-node-resolve": "^8.0.1",
+    "@types/clean-css": "^4.2.6",
     "@types/color": "^3.0.1",
     "@types/domhandler": "^2.4.2",
     "@types/jest": "^26.0.0",

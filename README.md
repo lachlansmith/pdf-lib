@@ -1026,7 +1026,8 @@ _This example produces [this PDF](assets/pdfs/examples/draw_svg_paths.pdf)_.
 <!-- prettier-ignore -->
 ```js
 import { PDFDocument } from 'pdf-lib'
-import HtmlReactParser from 'html-react-parser'
+import parse from 'html-react-parser'
+import { minify } from 'html-minifier'
 
 // Create a new PDFDocument
 const pdfDoc = await PDFDocument.create()
@@ -1041,14 +1042,12 @@ const svg =
         <rect x="50" y="20" width="150" height="150" style="fill:blue;stroke:pink;stroke-width:5;fill-opacity:0.1;stroke-opacity:0.9" /> \
     </svg>'
 
-const jsx = HtmlReactParser(
-    svg,
-    {
-        htmlparser2: {
-            lowerCaseTags: false,
-        },
+const string = minify(svg, { minifyCSS: true });
+const jsx = parse(string, {
+    htmlparser2: {
+        lowerCaseTags: false,
     },
-); // convert the svg string to valid JSX
+});
 
 // return graphic a DOM like structure
 const graphicFromSvgString = await doc.parseJsx(jsx);
