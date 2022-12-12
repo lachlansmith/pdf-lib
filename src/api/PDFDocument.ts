@@ -18,7 +18,6 @@ import {
   JpegEmbedder,
   PageBoundingBox,
   PageEmbeddingMismatchedContextError,
-  SVGParserNotFoundError,
   PDFCatalog,
   PDFContext,
   PDFDict,
@@ -45,7 +44,7 @@ import {
   Base64SaveOptions,
   LoadOptions,
   CreateOptions,
-  FromOptions,
+  OfOptions,
   EmbedFontOptions,
   SetTitleOptions,
   EmbedJsxOptions,
@@ -72,7 +71,7 @@ import FileEmbedder, { AFRelationship } from 'src/core/embedders/FileEmbedder';
 import PDFEmbeddedFile from 'src/api/PDFEmbeddedFile';
 import PDFJavaScript from 'src/api/PDFJavaScript';
 import JavaScriptEmbedder from 'src/core/embedders/JavaScriptEmbedder';
-import JSXParser, { JSXParserState } from 'src/api/JSXParser';
+import parseJsx, { JSXParserState } from 'src/api/JSXParser';
 
 /**
  * Represents a PDF document.
@@ -179,23 +178,41 @@ export default class PDFDocument {
    * @param options The options to be used when drawing the document.
    * @returns Resolves with a document drawn from DOM input
    */
-  static async from(
+  static async of(
     elements: JSX.Element | JSX.Element[],
-    options: FromOptions = {},
+    options: OfOptions = {},
   ) {
-    const {
-      updateMetadata = true,
-      throwOnInvalidElement = true,
-      fonts = {},
-    } = options;
+    const { updateMetadata = true } = options;
 
     const doc = await PDFDocument.create({ updateMetadata });
+    const {
+      css = {},
+      defs = {},
+      fonts = {},
+      attributes = {},
+      throwOnInvalidElement = true,
+    } = options;
+
     if (elements instanceof Array) {
       await Promise.all(
         elements.map(async (el, index) => {
           const graphic = await doc.embedJsx(el, {
-            throwOnInvalidElement,
-            fonts,
+            state: new JSXParserState(
+              css,
+              defs,
+              fonts,
+              {
+                fontFamily: 'Courier',
+                fontWeight: '400',
+                fontStyle: 'normal',
+                fontSize: 12,
+                font: await doc.embedFont(StandardFonts.Courier),
+                ...attributes,
+              },
+              {
+                throwOnInvalidElement,
+              },
+            ),
           });
 
           if (!graphic) {
@@ -203,7 +220,7 @@ export default class PDFDocument {
           }
 
           if (!el.props.viewBox) {
-            throw new UndefinedViewBoxError(el.type.toString(), index);
+            throw new UndefinedViewBoxError(index);
           }
 
           const page = doc.addPage(
@@ -217,8 +234,22 @@ export default class PDFDocument {
       const tagName = elements.type.toString();
 
       const graphic = await doc.embedJsx(elements, {
-        throwOnInvalidElement,
-        fonts,
+        state: new JSXParserState(
+          css,
+          defs,
+          fonts,
+          {
+            fontFamily: 'Courier',
+            fontWeight: '400',
+            fontStyle: 'normal',
+            fontSize: 12,
+            font: await doc.embedFont(StandardFonts.Courier),
+            ...attributes,
+          },
+          {
+            throwOnInvalidElement,
+          },
+        ),
       });
 
       if (!graphic) {
@@ -226,7 +257,7 @@ export default class PDFDocument {
       }
 
       if (!elements.props.viewBox) {
-        throw new UndefinedViewBoxError(tagName, 0);
+        throw new UndefinedViewBoxError(0);
       }
 
       const page = doc.addPage(
@@ -1315,14 +1346,25 @@ export default class PDFDocument {
    * @returns Resolves with the embedded graphics to draw.
    */
   async embedJsx(element: JSX.Element, options: EmbedJsxOptions = {}) {
-    const tagName = element.type.toString() as keyof typeof JSXParser;
+    const {
+      state = new JSXParserState(
+        {},
+        {},
+        {},
+        {
+          fontFamily: 'Courier',
+          fontWeight: '400',
+          fontStyle: 'normal',
+          fontSize: 12,
+          font: await this.embedFont(StandardFonts.Courier),
+        },
+        {
+          throwOnInvalidElement: true,
+        },
+      ),
+    } = options;
 
-    if (typeof JSXParser[tagName] !== 'function') {
-      throw new SVGParserNotFoundError(tagName);
-    }
-
-    const state = new JSXParserState(options);
-    return await JSXParser[tagName](element.props, this, state);
+    return await parseJsx(element, this, state);
   }
 
   /**

@@ -16,3 +16,7 @@ export const definedKeysOf = <T extends { [key: string]: any }>(obj: T): T => {
   Object.keys(obj).forEach((key) => obj[key] === undefined && delete obj[key]);
   return obj;
 };
+
+export const first = (obj: any) => Object.keys(obj)[0];
+
+export const exists = (obj: any, key: any) => Object.keys(obj).includes(key);

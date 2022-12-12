@@ -10,7 +10,6 @@ import {
   lineTo,
   moveTo,
 } from 'src/api/operators';
-import { translate } from 'src/api/transform';
 import { PDFOperator } from 'src/core';
 import { Shape, Group } from 'src/api/JSXParser';
 
@@ -507,28 +506,64 @@ export const rect = (
   const Y = y;
   const W = width;
   const H = height;
-  const RX = rx ?? 0;
-  if (ry) ry = rx;
-  //   let RY = options.ry ?? 0;
-  //   if (RX && !options.ry) {
-  //     RY = RX;
+  let RX = 0;
+  let RY = 0;
+
+  if (rx && !ry) {
+    RX = rx;
+    RY = rx;
+  } else if (ry && !rx) {
+    RX = ry;
+    RY = ry;
+  } else if (rx && ry) {
+    RX = rx;
+    RY = ry;
+  }
+
+  if (RX > W / 2) {
+    RX = W / 2;
+  }
+  if (RY > H / 2) {
+    RY = H / 2;
+  }
+  //   const hasCurves = RX > 0 && RY > 0;
+
+  RX = 0;
+  RY = 0;
+
+  const ops: PDFOperator[] = [];
+
+  ops.push(moveTo(X + RX, Y), lineTo(X + W - RX, Y));
+  //   if (hasCurves) {
+  //     const operators = solveArc(X + W, Y + RY, [RX, RY, 0, 0, 1, X + W, Y + RY]);
+  //     operators.forEach((o) => ops.push(o));
   //   }
-  const KAPPA = 4.0 * ((Math.sqrt(2) - 1.0) / 3.0);
-  const CX = RX * (1.0 - KAPPA);
-  //   const CY = RY * (1.0 - KAPPA);
-  return [
-    translate(X, Y),
-    moveTo(RX, 0),
-    lineTo(W - RX, 0),
-    RX > 0 ? appendBezierCurve(W - CX, 0, W, CX, W, RX) : undefined,
-    lineTo(W, H - RX),
-    RX > 0 ? appendBezierCurve(W, H - CX, W - CX, H, W - RX, H) : undefined,
-    lineTo(RX, H),
-    RX > 0 ? appendBezierCurve(CX, H, 0, H - CX, 0, H - RX) : undefined,
-    RX > 0 ? lineTo(0, RX) : undefined,
-    RX > 0 ? appendBezierCurve(0, CX, CX, 0, RX, 0) : undefined,
-    closePath(),
-  ].filter(Boolean) as PDFOperator[];
+  ops.push(lineTo(X + W - RX, Y + H - RY));
+  //   if (hasCurves) {
+  //     const operators = solveArc(X + W - RX, Y + H, [
+  //       RX,
+  //       RY,
+  //       0,
+  //       0,
+  //       1,
+  //       X + W - RX,
+  //       Y + H,
+  //     ]);
+  //     operators.forEach((o) => ops.push(o));
+  //   }
+  ops.push(lineTo(X + RX, Y + H - RY));
+  //   if (hasCurves) {
+  //     const operators = solveArc(X, Y + H - RY, [RX, RY, 0, 0, 1, X, Y + H - RY]);
+  //     operators.forEach((o) => ops.push(o));
+  //   }
+  ops.push(lineTo(X + RX, Y + RY));
+  //   if (hasCurves) {
+  //     const operators = solveArc(X + RX, Y, [RX, RY, 0, 0, 1, X + RX, Y]);
+  //     operators.forEach((o) => ops.push(o));
+  //   }
+  ops.push(closePath());
+
+  return ops.filter(Boolean) as PDFOperator[];
 };
 
 export const arc = (options: {

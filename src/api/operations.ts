@@ -38,7 +38,7 @@ import { asNumber } from 'src/api/objects';
 import { translate, scale } from 'src/api/transform';
 import { Shape, Text, Image, Group } from 'src/api/JSXParser';
 import PDFPage from 'src/api/PDFPage';
-import { breakTextIntoLines, cleanText, lineSplit } from 'src/utils';
+// import { breakTextIntoLines, cleanText, lineSplit } from 'src/utils';
 
 export interface DrawTextOptions {
   color: Color;
@@ -370,7 +370,7 @@ export const drawPath = (options: {
   ].filter(Boolean) as PDFOperator[];
 
 export const draw = (
-  graphic: Shape | Text | Image | Group,
+  g: Shape | Text | Image | Group,
   page: PDFPage,
   options: {
     x: number | PDFNumber;
@@ -398,7 +398,7 @@ export const draw = (
     operators.push(endPath());
   }
 
-  const ops = drawGraphic(graphic, page); // can't use spread operator or will hit max call stack
+  const ops = graphic(g, page); // can't use spread operator or will hit max call stack
   ops.forEach((o) => operators.push(o));
 
   operators.push(popGraphicsState());
@@ -812,7 +812,7 @@ export const drawOptionList = (options: {
   ];
 };
 
-export const drawGraphic = (
+export const graphic = (
   g: Shape | Text | Image | Group,
   page: PDFPage,
 ): PDFOperator[] => {
@@ -833,12 +833,13 @@ export const drawGraphic = (
     ops.push(endPath());
   }
 
-  // draw shape, text or image to graphic state, or continue from groups child graphics
+  // draw shape, text or image to graphic state, or continue walking tree from group
   switch (g.type) {
     case 'group':
-      g.children.forEach((graphic) => {
-        const operators = drawGraphic(graphic, page);
-        operators.forEach((o) => ops.push(o));
+      // for each child recursively call graphic and push resultant operators
+      g.children.forEach((child) => {
+        const operators = graphic(child, page);
+        operators.forEach((o) => ops.push(o)); // can't use spread operator or will hit max call stack
       });
       break;
 
@@ -869,7 +870,7 @@ export const drawGraphic = (
           : undefined,
       );
 
-      // apply operators
+      // apply operators, i.e. moveTo, lineTo
       g.operators.forEach((o) => ops.push(o));
 
       // apply fill and stroke, or separately
@@ -884,6 +885,7 @@ export const drawGraphic = (
       break;
 
     case 'text':
+      // maybe apply mix blend mode and opacity to graphic state
       if (g.mixBlendMode || g.fillOpacity || g.strokeOpacity) {
         const graphicsState = page.doc.context.obj({
           Type: 'ExtGState',
@@ -896,39 +898,36 @@ export const drawGraphic = (
         ops.push(setGraphicsState(GState));
       }
 
-      const wordBreaks = g.wordBreaks || page.doc.defaultWordBreaks;
-      const textWidth = (t: string) => g.font.widthOfTextAtSize(t, g.fontSize);
-      const lines =
-        g.maxWidth === undefined
-          ? lineSplit(cleanText(g.text))
-          : breakTextIntoLines(g.text, wordBreaks, g.maxWidth, textWidth);
+      console.log(g);
 
-      const encodedLines = new Array(lines.length) as PDFHexString[];
-      for (let idx = 0, len = lines.length; idx < len; idx++) {
-        encodedLines[idx] = g.font.encodeText(lines[idx]);
-      }
+      //   ops.push(scale(1, -1)); // make top left)
 
-      const font = page.node.newFontDictionary(g.font.name, g.font.ref);
+      g.segments.forEach((segment) => {
+        if (typeof segment === 'string') {
+          const text = g.font.encodeText(segment);
 
-      ops.push(
-        beginText(),
-        setFillingColor(g.fill),
-        setFontAndSize(font, g.fontSize),
-        setLineHeight(g.lineHeight),
-        // rotateAndSkewTextRadiansAndTranslate(
-        //   toRadians(options.rotate),
-        //   toRadians(options.xSkew),
-        //   toRadians(options.ySkew),
-        //   options.x,
-        //   options.y,
-        // ),
-      );
+          const font = page.node.newFontDictionary(g.font.name, g.font.ref);
 
-      for (let idx = 0, len = encodedLines.length; idx < len; idx++) {
-        ops.push(showText(encodedLines[idx]), nextLine());
-      }
+          ops.push(
+            beginText(),
+            g.fill ? setFillingColor(g.fill as Color) : undefined,
+            setFontAndSize(font, g.fontSize),
+            g.lineHeight ? setLineHeight(g.lineHeight) : undefined,
+            // rotateAndSkewTextRadiansAndTranslate(
+            //   toRadians(options.rotate),
+            //   toRadians(options.xSkew),
+            //   toRadians(options.ySkew),
+            //   options.x,
+            //   options.y,
+            // ),
+          );
 
-      ops.push(endText(), popGraphicsState());
+          ops.push(showText(text), endText());
+        } else {
+          const operators = graphic(segment, page);
+          operators.forEach((o) => ops.push(o));
+        }
+      });
 
       break;
 

@@ -1,4 +1,5 @@
 // tslint:disable: max-classes-per-file
+import { JSXParserState } from 'src/api/JSXParser';
 import PDFObject from 'src/core/objects/PDFObject';
 import { arrayAsString } from 'src/utils';
 
@@ -220,54 +221,62 @@ export class MissingKeywordError extends PDFParsingError {
   }
 }
 
-export class SVGParsingError extends Error {
-  constructor(tagName: string, details: string) {
-    const msg = `Failed to parse SVG element (tagName:${tagName}): ${details}`;
-    super(msg);
-  }
-}
-
-export class SVGParserNotFoundError extends SVGParsingError {
-  constructor(tagName: string) {
-    const msg = `Parser not found`;
-    super(tagName, msg);
-  }
-}
-
-export class SVGParserNotSupportedError extends SVGParsingError {
-  constructor(tagName: string) {
-    const msg = `Parser not supported`;
-    super(tagName, msg);
-  }
-}
-
-export class SVGParserFontError extends SVGParsingError {
-  constructor(message: string) {
-    super('style', message);
-  }
-}
-
-export class SVGParserUnsupportedImageError extends SVGParsingError {
-  constructor(mimeType: string) {
-    super(
-      'image',
-      'Unsupported image, ' +
-        mimeType +
-        '. PDFs support image/jpeg or image/png',
-    );
-  }
-}
-
 export class UndefinedReturnError extends Error {
   constructor(tagName: string) {
-    const msg = `Nothing to draw (tagName:${tagName}): Element returned undefined`;
+    const msg = `Nothing to draw (tagName:${tagName}): Parsed JSX element returned undefined graphic`;
     super(msg);
   }
 }
 
 export class UndefinedViewBoxError extends Error {
-  constructor(tagName: string, index: number) {
-    const msg = `Failed to create PDFDocument from JSX elements (tagName:${tagName} index:${index}): SVG element doesn't have viewBox`;
+  constructor(index: number) {
+    const msg = `PDFDocument of JSX elements (tagName:svg index:${index}): SVG element doesn't have viewBox`;
     super(msg);
+  }
+}
+
+export class JSXParsingError extends Error {
+  constructor(state: JSXParserState, reason: string) {
+    const msg = `Failed to parse JSX element (tagName:${state.tagName}): ${reason}`;
+    super(msg);
+  }
+}
+
+export enum Invalid {
+  fontFamily = 'fontFamily',
+  fontWeight = 'fontWeight',
+  fontStyle = 'fontStyle',
+}
+
+export class JSXParserInvalidAttributeError extends JSXParsingError {
+  constructor(state: JSXParserState, invalid: Invalid, reason?: string) {
+    let msg = `${reason}`;
+    switch (invalid) {
+      case Invalid.fontFamily:
+        break;
+      case Invalid.fontWeight:
+        break;
+      case Invalid.fontStyle:
+        break;
+    }
+
+    super(state, msg);
+  }
+}
+
+export class JSXParserInvalidElementError extends JSXParsingError {
+  constructor(state: JSXParserState, reason: string) {
+    super(state, reason);
+  }
+}
+
+export class JSXParserUnsupportedImageError extends JSXParsingError {
+  constructor(state: JSXParserState, mimeType: string) {
+    super(
+      state,
+      'Unsupported image, ' +
+        mimeType +
+        '. PDFs support image/jpeg or image/png',
+    );
   }
 }

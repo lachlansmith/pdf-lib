@@ -1,9 +1,9 @@
 import { Color, ColorTypes } from 'src/api/colors';
 import ColorParser from 'color';
 import { camel } from 'src/utils';
-import PDFFont from 'src/api/PDFFont';
 import { BlendMode } from 'src/api/PDFPageOptions';
 import {
+  JSXParserState,
   RadialGradient,
   LinearGradient,
   Filter,
@@ -56,25 +56,8 @@ export const viewBox = (viewBox: string) => {
   return [x1 - x0, y1 - y0] as [number, number];
 };
 
-export const font = async (
-  fonts: {
-    [family: string]: { [weight: string]: { [style: string]: PDFFont } };
-  },
-  fontFamily: string,
-  fontWeight: string,
-  fontStyle: string,
-) => {
-  const family = fontFamily;
-  const weight = fontWeight ? fontWeight : Object.keys(fonts[fontFamily])[0];
-  const style = fontStyle ? fontStyle : 'normal';
-
-  return fonts[family][weight][style];
-};
-
 export const color = (
-  defs: {
-    [id: string]: Mask | Filter | ClipPath | LinearGradient | RadialGradient;
-  },
+  state: JSXParserState,
   str: string | undefined,
   color?: Color,
 ): Color | LinearGradient | RadialGradient | undefined => {
@@ -82,7 +65,7 @@ export const color = (
   if (!str) return color;
   const match = /url\((.*)\)/g.exec(str);
   if (match) {
-    return defs[match[1]] as LinearGradient | RadialGradient;
+    return state.defs[match[1]] as LinearGradient | RadialGradient;
   }
   const { r, g, b } = ColorParser(str).rgb().object();
   return {
@@ -101,42 +84,31 @@ export const opacity = (fillOrStrokeOpacity?: string, opacity?: string) => {
     : undefined;
 };
 
-export const url = (
-  defs: {
-    [id: string]: Mask | Filter | ClipPath | LinearGradient | RadialGradient;
-  },
-  str?: string,
-) => {
+export const url = (state: JSXParserState, str?: string) => {
   if (!str) return undefined;
 
   const match = /url\((.*)\)/g.exec(str);
   if (match) {
-    return defs[match[1]] as Mask | Filter | ClipPath;
+    return state.defs[match[1]] as Mask | Filter | ClipPath;
   }
 
   return undefined;
 };
 
 export const clipPath = (
-  defs: {
-    [id: string]: Mask | Filter | ClipPath | LinearGradient | RadialGradient;
-  },
+  state: JSXParserState,
   clipString?: string,
-): ClipPath | undefined => url(defs, clipString) as ClipPath | undefined;
+): ClipPath | undefined => url(state, clipString) as ClipPath | undefined;
 
 export const filter = (
-  defs: {
-    [id: string]: Mask | Filter | ClipPath | LinearGradient | RadialGradient;
-  },
+  state: JSXParserState,
   filterString?: string,
-): Filter | undefined => url(defs, filterString) as Filter | undefined;
+): Filter | undefined => url(state, filterString) as Filter | undefined;
 
 export const mask = (
-  defs: {
-    [id: string]: Mask | Filter | ClipPath | LinearGradient | RadialGradient;
-  },
+  state: JSXParserState,
   maskString?: string,
-): Mask | undefined => url(defs, maskString) as Mask | undefined;
+): Mask | undefined => url(state, maskString) as Mask | undefined;
 
 export const mixBlendMode = (blendmode?: string): BlendMode | undefined => {
   if (!blendmode) return undefined;

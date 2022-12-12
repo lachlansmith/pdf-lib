@@ -1,9 +1,8 @@
-import React from 'react';
+import { Children } from 'react';
 import CssParser from 'clean-css';
 import fontkit from '@pdf-lib/fontkit';
-import PDFFont from 'src/api/PDFFont';
-import { StandardFonts } from 'src/api/StandardFonts';
 
+import PDFFont from 'src/api/PDFFont';
 import { LineCapStyle, LineJoinStyle } from 'src/api/operators';
 import { PDFImage, BlendMode } from 'src/api';
 import PDFDocument from './PDFDocument';
@@ -20,16 +19,16 @@ import {
 } from 'src/api/shape';
 import { transform } from 'src/api/transform';
 import {
-  SVGParserNotSupportedError,
   PDFOperator,
-  SVGParserFontError,
-  SVGParserNotFoundError,
-  SVGParserUnsupportedImageError,
+  JSXParserInvalidElementError,
+  JSXParserInvalidAttributeError,
+  JSXParserUnsupportedImageError,
+  Invalid,
+  JSXParsingError,
 } from 'src/core';
 import {
   definedKeysOf,
   attributes,
-  font,
   mixBlendMode,
   mask,
   filter,
@@ -37,66 +36,21 @@ import {
   color,
   opacity,
   camel,
+  first,
+  exists,
 } from 'src/utils';
+
+export const HTMLMinifierOptions = {
+  collapseWhitespace: true,
+  caseSensitive: true,
+  removeComments: true,
+};
 
 export const HTMLReactParserOptions = {
   htmlparser2: {
     lowerCaseTags: false,
   },
 };
-
-export interface Mask {
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
-  maskContentUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
-  maskUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
-  operators: PDFOperator[];
-}
-
-export interface Filter {
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
-  filterUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
-  primitiveUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
-  effects: Effect[];
-}
-
-export interface Effect {}
-
-export interface ClipPath {
-  clipPathUnits: 'userSpaceOnUse' | 'objectBoundingBox';
-  operators: PDFOperator[];
-}
-
-export interface LinearGradient {
-  x1?: number;
-  y1?: number;
-  x2: number;
-  y2?: number;
-  gradientUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
-  gradientTransform?: PDFOperator[];
-  spreadMethod?: 'pad' | 'reflect' | 'reflect';
-  stops: Stop[];
-}
-
-export interface RadialGradient {
-  cx?: number;
-  cy?: number;
-  r?: number;
-  fr: number;
-  fx?: number;
-  fy?: number;
-  gradientUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
-  gradientTransform?: PDFOperator[];
-  spreadMethod?: 'pad' | 'reflect' | 'reflect';
-  stops: Stop[];
-}
-
-export interface Stop {}
 
 interface Iterator {
   [key: string]: any;
@@ -130,9 +84,13 @@ export interface Shape extends Base {
 
 export interface Text extends Base {
   type: 'text';
-  //   value: string;
   font: PDFFont;
-  children?: Text[];
+  fontSize: number;
+  segments: (string | Text)[];
+  lineHeight?: number;
+  fill?: Color | LinearGradient | RadialGradient;
+  fillOpacity?: number;
+  strokeOpacity?: number;
 }
 
 export interface Image extends Base {
@@ -159,72 +117,306 @@ export interface Group extends Base {
   children: (Shape | Text | Image | Group)[];
 }
 
-export class JSXParserState {
-  throwOnInvalidElement: boolean;
-  css: any;
-  fonts: {
-    [family: string]: { [weight: string]: { [style: string]: PDFFont } };
-  };
-  defs: {
-    [id: string]: Mask | Filter | ClipPath | LinearGradient | RadialGradient;
-  };
-
-  constructor(
-    options: {
-      throwOnInvalidElement?: boolean;
-      fonts?: {
-        [family: string]: { [weight: string]: { [style: string]: PDFFont } };
-      };
-    } = {},
-  ) {
-    const { throwOnInvalidElement = true, fonts = {} } = options;
-
-    this.throwOnInvalidElement = throwOnInvalidElement;
-    this.fonts = fonts;
-    this.css = {};
-    this.defs = {};
-  }
+export interface Mask {
+  type: 'mask';
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  maskContentUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
+  maskUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
+  operators: PDFOperator[];
 }
 
-export const children = async <T>(
-  children: any,
-  callback: (child: { tagName: keyof Parsers; props: any }) => Promise<T>,
-) => {
-  const texts = [];
-  for (const child of React.Children.toArray(children)) {
+export interface Filter {
+  type: 'filter';
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  filterUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
+  primitiveUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
+  effects: Effect[];
+}
+
+export interface ClipPath {
+  type: 'clipPath';
+  clipPathUnits: 'userSpaceOnUse' | 'objectBoundingBox';
+  operators: PDFOperator[];
+}
+
+export interface LinearGradient {
+  type: 'linearGradient';
+  x1?: number;
+  y1?: number;
+  x2: number;
+  y2?: number;
+  gradientUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
+  gradientTransform?: PDFOperator[];
+  spreadMethod?: 'pad' | 'reflect' | 'reflect';
+  stops: Stop[];
+}
+
+export interface RadialGradient {
+  type: 'radialGradient';
+  cx?: number;
+  cy?: number;
+  r?: number;
+  fr: number;
+  fx?: number;
+  fy?: number;
+  gradientUnits?: 'userSpaceOnUse' | 'objectBoundingBox';
+  gradientTransform?: PDFOperator[];
+  spreadMethod?: 'pad' | 'reflect' | 'reflect';
+  stops: Stop[];
+}
+
+export interface Stop {}
+
+export interface Effect {}
+
+export interface Css {
+  [className: string]: any;
+}
+
+export interface Defs {
+  [url: string]: Mask | Filter | ClipPath | LinearGradient | RadialGradient;
+}
+
+export interface Fonts {
+  [family: string]: { [weight: string]: { [style: string]: PDFFont } };
+}
+
+export interface Attributes {
+  fontFamily: string;
+  fontWeight: string;
+  fontStyle: string;
+  fontSize: number;
+  font: PDFFont;
+  fill?: Color;
+}
+
+export class JSXParserState {
+  css: Css;
+  defs: Defs;
+  fonts: Fonts;
+  attributes: Attributes;
+
+  throwOnInvalidElement: boolean;
+
+  tagName?: keyof JSXParsers;
+
+  constructor(
+    css: Css,
+    defs: Defs,
+    fonts: Fonts,
+    attributes: Attributes,
+    options: {
+      throwOnInvalidElement?: boolean;
+    } = {},
+  ) {
+    this.css = css;
+    this.defs = defs;
+    this.fonts = fonts;
+    this.attributes = attributes;
+
+    const { throwOnInvalidElement = true } = options;
+
+    this.throwOnInvalidElement = throwOnInvalidElement;
+  }
+
+  font = (
+    fontFamily: string | undefined,
+    fontWeight: string | undefined,
+    fontStyle: string | undefined,
+    fontSize: number | undefined,
+  ) => {
+    if (fontFamily && this.attributes.fontFamily !== fontFamily) {
+      // if font family and different family
+      this.attributes.fontFamily = fontFamily;
+
+      if (fontWeight) {
+        // new family, use provided weight
+        this.attributes.fontWeight = fontWeight;
+
+        if (fontStyle) {
+          // new family and weight, use provided style
+          this.attributes.fontStyle;
+        } else {
+          // new family and weight, unknown style
+
+          if (!exists(this.fonts, this.attributes.fontFamily)) {
+            // check family exists
+            throw new JSXParserInvalidAttributeError(this, Invalid.fontFamily);
+          }
+
+          if (
+            !exists(
+              this.fonts[this.attributes.fontFamily],
+              this.attributes.fontWeight,
+            )
+          ) {
+            // check weight exists on family
+            throw new JSXParserInvalidAttributeError(this, Invalid.fontWeight);
+          }
+
+          this.attributes.fontStyle = first(
+            // choose first in provided weight
+            this.fonts[this.attributes.fontFamily][this.attributes.fontWeight],
+          );
+        }
+      } else {
+        // new family, unknown weight
+
+        if (!exists(this.fonts, this.attributes.fontFamily)) {
+          // check family exists
+          throw new JSXParserInvalidAttributeError(this, Invalid.fontFamily);
+        }
+
+        this.attributes.fontWeight = first(
+          // choose first in family
+          this.fonts[this.attributes.fontFamily],
+        );
+
+        if (fontStyle) {
+          // new family and choosen weight, use provided style
+          this.attributes.fontStyle;
+        } else {
+          // new family and choosen weight, unknown style
+
+          if (
+            !exists(
+              this.fonts[this.attributes.fontFamily],
+              this.attributes.fontWeight,
+            )
+          ) {
+            // check weight exists on family
+            throw new JSXParserInvalidAttributeError(this, Invalid.fontWeight);
+          }
+
+          this.attributes.fontStyle = first(
+            // choose first in choosen weight
+            this.fonts[this.attributes.fontFamily][this.attributes.fontWeight],
+          );
+        }
+      }
+    } else {
+      // if not font family or same family, use current family
+      if (fontWeight && this.attributes.fontWeight !== fontWeight) {
+        // if font weight and different weight, use that weight
+        this.attributes.fontWeight = fontWeight;
+
+        if (fontStyle && this.attributes.fontStyle !== fontStyle) {
+          // if font style and different style, use that style
+          this.attributes.fontStyle = fontStyle;
+        }
+      }
+    }
+
+    if (!exists(this.fonts, this.attributes.fontFamily)) {
+      // check family exists
+      throw new JSXParserInvalidAttributeError(this, Invalid.fontFamily);
+    }
+
     if (
-      typeof child === 'string' ||
-      typeof child === 'number' ||
-      !('type' in child)
+      !exists(
+        this.fonts[this.attributes.fontFamily],
+        this.attributes.fontWeight,
+      )
     ) {
-      // TODO: figure out if these cases are applicable
+      // check weight exists on family
+      throw new JSXParserInvalidAttributeError(this, Invalid.fontWeight);
+    }
+
+    if (
+      !exists(
+        this.fonts[this.attributes.fontFamily][this.attributes.fontWeight],
+        this.attributes.fontStyle,
+      )
+    ) {
+      // check style exists on selected families selected weight
+      throw new JSXParserInvalidAttributeError(this, Invalid.fontStyle);
+    }
+
+    if (
+      this.attributes.font.ref.tag !==
+      this.fonts[this.attributes.fontFamily][this.attributes.fontWeight][
+        this.attributes.fontStyle
+      ].ref.tag
+    ) {
+      // current font is different to selected font, use selected font
+      this.attributes.font = this.fonts[this.attributes.fontFamily][
+        this.attributes.fontWeight
+      ][this.attributes.fontStyle];
+    }
+
+    if (fontSize && this.attributes.fontSize !== fontSize) {
+      // current font size is different to selected font size, use selected font size
+      this.attributes.fontSize = fontSize;
+    }
+  };
+
+  fill = (fill?: string) => {
+    if (fill) {
+      // current fill is different to selected fill, use selected fill
+      this.attributes.fill = color(this, fill) as Color;
+    }
+  };
+
+  copy = () => {
+    return new JSXParserState(
+      this.css,
+      this.defs,
+      this.fonts,
+      this.attributes,
+      {
+        throwOnInvalidElement: this.throwOnInvalidElement,
+      },
+    );
+  };
+}
+
+const children = async <T>(
+  children: any,
+  callback: (child: string | JSX.Element) => Promise<T>,
+) => {
+  const kiddles = [];
+  for (const child of Children.toArray(children)) {
+    if (typeof child === 'number') {
       continue;
     }
 
-    const tagName = child.type.toString() as keyof Parsers;
-    if (typeof parsers[tagName] !== 'function') {
-      throw new SVGParserNotFoundError(tagName);
+    if (typeof child === 'string') {
+      kiddles.push(await callback(child));
+      continue;
     }
 
-    texts.push(await callback({ tagName: tagName, props: child.props }));
+    if (!('type' in child)) {
+      continue;
+    }
+
+    kiddles.push(await callback(child));
   }
 
-  return texts.filter(Boolean) as Exclude<T, undefined>[];
+  return kiddles.filter(Boolean) as Exclude<T, undefined>[];
 };
 
-type Parsers = typeof parsers;
+type JSXParsers = typeof parsers;
 
 export const parsers = {
   a(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('a');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
   },
 
   circle(props: any, _: PDFDocument, state: JSXParserState) {
-    const attr = attributes(props, state.css, props.style);
+    const a = attributes(props, state.css, props.style);
 
     const shape: Shape = {
       type: 'shape',
@@ -233,27 +425,27 @@ export const parsers = {
         parseFloat(props.cy),
         parseFloat(props.r),
       ),
-      mask: mask(state.defs, attr.mask),
-      filter: filter(state.defs, attr.filter),
-      clipPath: clipPath(state.defs, attr.clipPath),
-      clipRule: attr.clipRule,
-      fill: color(state.defs, attr.fill, {
+      mask: mask(state, a.mask),
+      filter: filter(state, a.filter),
+      clipPath: clipPath(state, a.clipPath),
+      clipRule: a.clipRule,
+      fill: color(state, a.fill, {
         type: ColorTypes.RGB,
         red: 0,
         green: 0,
         blue: 0,
       } as RGB),
-      fillRule: attr.fillRule,
-      fillOpacity: opacity(attr.fillOpacity, attr.opacity),
-      stroke: color(state.defs, attr.stroke),
-      strokeWidth: attr.strokeWidth,
-      strokeLineJoin: attr.strokeLineJoin,
-      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
-      strokeLineCap: attr.strokeLineCap,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: parseFloat(attr.strokeDashOffset),
-      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
-      mixBlendMode: mixBlendMode(attr.mixBlendMode),
+      fillRule: a.fillRule,
+      fillOpacity: opacity(a.fillOpacity, a.opacity),
+      stroke: color(state, a.stroke),
+      strokeWidth: a.strokeWidth,
+      strokeLineJoin: a.strokeLineJoin,
+      strokeMiterLimit: parseFloat(a.strokeMiterLimit),
+      strokeLineCap: a.strokeLineCap,
+      strokeDashArray: a.strokeDashArray,
+      strokeDashOffset: parseFloat(a.strokeDashOffset),
+      strokeOpacity: opacity(a.strokeOpacity, a.opacity),
+      mixBlendMode: mixBlendMode(a.mixBlendMode),
       transform: transform(props.transform),
     };
 
@@ -263,11 +455,34 @@ export const parsers = {
   async clipPath(props: any, doc: PDFDocument, state: JSXParserState) {
     const url = '#' + props.id;
     const clipPath: ClipPath = {
+      type: 'clipPath',
       clipPathUnits: props.clipPathUnits,
       operators: shape({
         type: 'group',
         children: await children(props.children, async (child) => {
-          return await this[child.tagName](child.props, doc, state);
+          if (typeof child === 'string') {
+            return;
+          }
+
+          const tagName = child.type.toString() as keyof JSXParsers;
+          if (
+            tagName !== 'circle' &&
+            tagName !== 'ellipse' &&
+            tagName !== 'path' &&
+            tagName !== 'polygon' &&
+            tagName !== 'rect' &&
+            // tagName !== 'text' && // needs opentype.js conversion to Shape
+            tagName !== 'use'
+          ) {
+            throw new JSXParserInvalidElementError(
+              state,
+              'Invalid child, ' + tagName,
+            );
+          }
+
+          state.tagName = tagName;
+
+          return await parsers[tagName](child.props, doc, state.copy());
         }),
       }),
     };
@@ -279,7 +494,11 @@ export const parsers = {
 
   async defs(props: any, doc: PDFDocument, state: JSXParserState) {
     await children(props.children, async (child) => {
-      return await this[child.tagName](child.props, doc, state);
+      if (typeof child === 'string') {
+        return;
+      }
+
+      return await parseJsx(child, doc, state.copy());
     });
 
     return undefined;
@@ -287,14 +506,17 @@ export const parsers = {
 
   desc(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('desc');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
   },
 
   ellipse(props: any, _: PDFDocument, state: JSXParserState) {
-    const attr = attributes(props, state.css, props.style);
+    const a = attributes(props, state.css, props.style);
 
     const shape: Shape = {
       type: 'shape',
@@ -304,27 +526,27 @@ export const parsers = {
         parseFloat(props.rx),
         parseFloat(props.ry),
       ),
-      mask: mask(state.defs, attr.mask),
-      filter: filter(state.defs, attr.filter),
-      clipPath: clipPath(state.defs, attr.clipPath),
-      clipRule: attr.clipRule,
-      fill: color(state.defs, attr.fill, {
+      mask: mask(state, a.mask),
+      filter: filter(state, a.filter),
+      clipPath: clipPath(state, a.clipPath),
+      clipRule: a.clipRule,
+      fill: color(state, a.fill, {
         type: ColorTypes.RGB,
         red: 0,
         green: 0,
         blue: 0,
       } as RGB),
-      fillRule: attr.fillRule,
-      fillOpacity: opacity(attr.fillOpacity, attr.opacity),
-      stroke: color(state.defs, attr.stroke),
-      strokeWidth: attr.strokeWidth,
-      strokeLineJoin: attr.strokeLineJoin,
-      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
-      strokeLineCap: attr.strokeLineCap,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: parseFloat(attr.strokeDashOffset),
-      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
-      mixBlendMode: mixBlendMode(attr.mixBlendMode),
+      fillRule: a.fillRule,
+      fillOpacity: opacity(a.fillOpacity, a.opacity),
+      stroke: color(state, a.stroke),
+      strokeWidth: a.strokeWidth,
+      strokeLineJoin: a.strokeLineJoin,
+      strokeMiterLimit: parseFloat(a.strokeMiterLimit),
+      strokeLineCap: a.strokeLineCap,
+      strokeDashArray: a.strokeDashArray,
+      strokeDashOffset: parseFloat(a.strokeDashOffset),
+      strokeOpacity: opacity(a.strokeOpacity, a.opacity),
+      mixBlendMode: mixBlendMode(a.mixBlendMode),
       transform: transform(props.transform),
     };
 
@@ -333,7 +555,10 @@ export const parsers = {
 
   feBlend(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feBlend');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -341,7 +566,10 @@ export const parsers = {
 
   feColorMatrix(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feColorMatrix');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -349,7 +577,10 @@ export const parsers = {
 
   feComponentTransfer(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feComponentTransfer');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -357,7 +588,10 @@ export const parsers = {
 
   feComposite(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feComposite');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -365,7 +599,10 @@ export const parsers = {
 
   feConvolveMatrix(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feConvolveMatrix');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -373,7 +610,10 @@ export const parsers = {
 
   feDiffuseLighting(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feDiffuseLighting');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -381,7 +621,10 @@ export const parsers = {
 
   feDisplacementMap(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feDisplacementMap');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -389,7 +632,10 @@ export const parsers = {
 
   feDistantLight(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feDistantLight');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -397,7 +643,10 @@ export const parsers = {
 
   feDropShadow(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feDropShadow');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -405,7 +654,10 @@ export const parsers = {
 
   feFlood(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feFlood');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -413,7 +665,10 @@ export const parsers = {
 
   feFuncA(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feFuncA');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -421,7 +676,10 @@ export const parsers = {
 
   feFuncB(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feFuncB');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -429,7 +687,10 @@ export const parsers = {
 
   feFuncG(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feFuncG');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -437,7 +698,10 @@ export const parsers = {
 
   feFuncR(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feFuncR');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -445,7 +709,10 @@ export const parsers = {
 
   feGaussianBlur(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feGaussianBlur');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -453,7 +720,10 @@ export const parsers = {
 
   feImage(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feImage');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -461,7 +731,10 @@ export const parsers = {
 
   feMerge(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feMerge');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -469,7 +742,10 @@ export const parsers = {
 
   feMergeNode(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feMergeNode');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -477,7 +753,10 @@ export const parsers = {
 
   feMorphology(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feMorphology');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -485,7 +764,10 @@ export const parsers = {
 
   feOffset(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feOffset');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -493,7 +775,10 @@ export const parsers = {
 
   fePointLight(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('fePointLight');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -501,7 +786,10 @@ export const parsers = {
 
   feSpecularLighting(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feSpecularLighting');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -509,7 +797,10 @@ export const parsers = {
 
   feSpotLight(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feSpotLight');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -517,7 +808,10 @@ export const parsers = {
 
   feTile(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feTile');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -525,7 +819,10 @@ export const parsers = {
 
   feTurbulence(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('feTurbulence');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -534,11 +831,15 @@ export const parsers = {
   async filter(props: any, doc: PDFDocument, state: JSXParserState) {
     // this is here until implementation verified
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('filter');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     const url = '#' + props.id;
     const filter: Filter = {
+      type: 'filter',
       x: parseFloat(props.x),
       y: parseFloat(props.y),
       width: parseFloat(props.width),
@@ -546,15 +847,45 @@ export const parsers = {
       filterUnits: props.filterUnits,
       primitiveUnits: props.primitiveUnits,
       effects: await children(props.children, async (child) => {
-        const filters = Object.keys(parsers).filter((tagName) =>
-          tagName.startsWith('fe'),
-        );
-
-        if (!filters.includes(child.tagName)) {
-          throw new SVGParserNotSupportedError('filter');
+        if (typeof child === 'string') {
+          return;
         }
 
-        return await this[child.tagName](child.props, doc, state);
+        const tagName = child.type.toString() as keyof JSXParsers;
+        if (
+          tagName !== 'feBlend' &&
+          tagName !== 'feColorMatrix' &&
+          tagName !== 'feComponentTransfer' &&
+          tagName !== 'feComposite' &&
+          tagName !== 'feConvolveMatrix' &&
+          tagName !== 'feDiffuseLighting' &&
+          tagName !== 'feDisplacementMap' &&
+          tagName !== 'feDistantLight' &&
+          tagName !== 'feDropShadow' &&
+          tagName !== 'feFlood' &&
+          tagName !== 'feFuncA' &&
+          tagName !== 'feFuncB' &&
+          tagName !== 'feFuncG' &&
+          tagName !== 'feFuncR' &&
+          tagName !== 'feGaussianBlur' &&
+          tagName !== 'feImage' &&
+          tagName !== 'feMerge' &&
+          tagName !== 'feMergeNode' &&
+          tagName !== 'feMorphology' &&
+          tagName !== 'feOffset' &&
+          tagName !== 'fePointLight' &&
+          tagName !== 'feSpecularLighting' &&
+          tagName !== 'feSpotLight' &&
+          tagName !== 'feTile' &&
+          tagName !== 'feTurbulence'
+        ) {
+          throw new JSXParserInvalidElementError(
+            state,
+            'Invalid child, ' + tagName,
+          );
+        }
+
+        return await parsers[tagName](child.props, doc, state.copy());
       }),
     };
 
@@ -564,29 +895,33 @@ export const parsers = {
   },
 
   async g(props: any, doc: PDFDocument, state: JSXParserState) {
-    const attr = attributes(props, state.css, props.style);
+    const a = attributes(props, state.css, props.style);
 
     const group: Group = {
       type: 'group',
-      mask: mask(state.defs, attr.mask),
-      filter: filter(state.defs, attr.filter),
-      clipPath: clipPath(state.defs, attr.clipPath),
-      clipRule: attr.clipRule,
-      fill: color(state.defs, attr.fill),
-      fillRule: attr.fillRule,
-      fillOpacity: parseFloat(attr.fillOpacity),
-      stroke: color(state.defs, attr.stroke),
-      strokeWidth: attr.strokeWidth,
-      strokeLineJoin: attr.strokeLineJoin,
-      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
-      strokeLineCap: attr.strokeLineCap,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: parseFloat(attr.strokeDashOffset),
-      strokeOpacity: parseFloat(attr.strokeOpacity),
-      mixBlendMode: mixBlendMode(attr.mixBlendMode),
+      mask: mask(state, a.mask),
+      filter: filter(state, a.filter),
+      clipPath: clipPath(state, a.clipPath),
+      clipRule: a.clipRule,
+      fill: color(state, a.fill),
+      fillRule: a.fillRule,
+      fillOpacity: parseFloat(a.fillOpacity),
+      stroke: color(state, a.stroke),
+      strokeWidth: a.strokeWidth,
+      strokeLineJoin: a.strokeLineJoin,
+      strokeMiterLimit: parseFloat(a.strokeMiterLimit),
+      strokeLineCap: a.strokeLineCap,
+      strokeDashArray: a.strokeDashArray,
+      strokeDashOffset: parseFloat(a.strokeDashOffset),
+      strokeOpacity: parseFloat(a.strokeOpacity),
+      mixBlendMode: mixBlendMode(a.mixBlendMode),
       transform: transform(props.transform),
       children: await children(props.children, async (child) => {
-        return await this[child.tagName](child.props, doc, state);
+        if (typeof child === 'string') {
+          return;
+        }
+
+        return await parseJsx(child, doc, state);
       }),
     };
 
@@ -594,7 +929,7 @@ export const parsers = {
   },
 
   async image(props: any, doc: PDFDocument, state: JSXParserState) {
-    const attr = attributes(props, state.css, props.style);
+    const a = attributes(props, state.css, props.style);
 
     // const res = await axios.get(new URL(props.href), {
     //   responseType: 'text',
@@ -623,12 +958,12 @@ export const parsers = {
         image: png,
         width: parseFloat(props.width),
         height: parseFloat(props.height),
-        mask: mask(state.defs, attr.mask),
-        filter: filter(state.defs, attr.filter),
-        clipPath: clipPath(state.defs, attr.clipPath),
-        clipRule: attr.clipRule,
-        opacity: parseFloat(attr.opacity),
-        mixBlendMode: mixBlendMode(attr.mixBlendMode),
+        mask: mask(state, a.mask),
+        filter: filter(state, a.filter),
+        clipPath: clipPath(state, a.clipPath),
+        clipRule: a.clipRule,
+        opacity: parseFloat(a.opacity),
+        mixBlendMode: mixBlendMode(a.mixBlendMode),
         transform: transform(props.transform),
       };
 
@@ -645,12 +980,12 @@ export const parsers = {
         image: jpeg,
         width: parseFloat(props.width),
         height: parseFloat(props.height),
-        mask: mask(state.defs, attr.mask),
-        filter: filter(state.defs, attr.filter),
-        clipPath: clipPath(state.defs, attr.clipPath),
-        clipRule: attr.clipRule,
-        opacity: parseFloat(attr.opacity),
-        mixBlendMode: mixBlendMode(attr.mixBlendMode),
+        mask: mask(state, a.mask),
+        filter: filter(state, a.filter),
+        clipPath: clipPath(state, a.clipPath),
+        clipRule: a.clipRule,
+        opacity: parseFloat(a.opacity),
+        mixBlendMode: mixBlendMode(a.mixBlendMode),
         transform: transform(props.transform),
       };
 
@@ -660,36 +995,35 @@ export const parsers = {
     // TODO: Image svg support may be added if a means (to pass a data uri to a string and then) to pass valid jsx is added to dependencies
     // This is not something willing to do at this time, but it would look like below
 
+    // import axios from 'axios';
     // import { Buffer } from 'buffer';
     // import HtmlReactParser from 'html-react-parser';
 
-    //   case 'image/svg+xml':
-    //     let string = props.href;
-    //     if (string === 'dataUri') {
-    //       string = Buffer.from(
-    //         string.split(';base64,')[1],
-    //         'base64',
-    //       ).toString(); // base64 encoding to svg string
-    //     } else if (string === 'url') {
-    //       const res = await axios.get(new URL(props.href), {
-    //         responseType: 'text',
-    //       });
-    //       string = res.data;
-    //     }
-
-    //     const jsx = HtmlReactParser(string, {
-    //       htmlparser2: {
-    //         lowerCaseTags: false,
-    //       },
+    // if (mimeType === 'image/svg+xml') {
+    //   let string = props.href;
+    //   if (string === 'dataUri') {
+    //     string = Buffer.from(string.split(';base64,')[1], 'base64').toString(); // base64 encoding to svg string
+    //   } else if (string === 'url') {
+    //     const res = await axios.get(new URL(props.href), {
+    //       responseType: 'text',
     //     });
+    //     string = res.data;
+    //   }
 
-    //     return await doc.parseJsx(jsx);
+    //   const element = HtmlReactParser(string, {
+    //     htmlparser2: {
+    //       lowerCaseTags: false,
+    //     },
+    //   });
 
-    throw new SVGParserUnsupportedImageError(mimeType);
+    //   return await parseJsx(element, doc, state);
+    // }
+
+    throw new JSXParserUnsupportedImageError(state, mimeType);
   },
 
   line(props: any, _: PDFDocument, state: JSXParserState) {
-    const attr = attributes(props, state.css, props.style);
+    const a = attributes(props, state.css, props.style);
 
     const shape: Shape = {
       type: 'shape',
@@ -699,19 +1033,19 @@ export const parsers = {
         parseFloat(props.x2),
         parseFloat(props.y2),
       ),
-      mask: mask(state.defs, attr.mask),
-      filter: filter(state.defs, attr.filter),
-      clipPath: clipPath(state.defs, attr.clipPath),
-      clipRule: attr.clipRule,
-      stroke: color(state.defs, attr.stroke),
-      strokeWidth: attr.strokeWidth,
-      strokeLineJoin: attr.strokeLineJoin,
-      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
-      strokeLineCap: attr.strokeLineCap,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: parseFloat(attr.strokeDashOffset),
-      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
-      mixBlendMode: mixBlendMode(attr.mixBlendMode),
+      mask: mask(state, a.mask),
+      filter: filter(state, a.filter),
+      clipPath: clipPath(state, a.clipPath),
+      clipRule: a.clipRule,
+      stroke: color(state, a.stroke),
+      strokeWidth: a.strokeWidth,
+      strokeLineJoin: a.strokeLineJoin,
+      strokeMiterLimit: parseFloat(a.strokeMiterLimit),
+      strokeLineCap: a.strokeLineCap,
+      strokeDashArray: a.strokeDashArray,
+      strokeDashOffset: parseFloat(a.strokeDashOffset),
+      strokeOpacity: opacity(a.strokeOpacity, a.opacity),
+      mixBlendMode: mixBlendMode(a.mixBlendMode),
       transform: transform(props.transform),
     };
 
@@ -721,11 +1055,15 @@ export const parsers = {
   async linearGradient(props: any, doc: PDFDocument, state: JSXParserState) {
     // this is here until implementation verified
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('linearGradient');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     const url = '#' + props.id;
     const linearGradient: LinearGradient = {
+      type: 'linearGradient',
       x1: parseFloat(props.x1),
       y1: parseFloat(props.y1),
       x2: parseFloat(props.x2),
@@ -734,7 +1072,21 @@ export const parsers = {
       gradientTransform: props.gradientTransform,
       spreadMethod: props.spreadMethod,
       stops: await children(props.children, async (child) => {
-        return await this[child.tagName](child.props, doc, state);
+        if (typeof child === 'string') {
+          return;
+        }
+
+        const tagName = child.type.toString() as keyof JSXParsers;
+        if (tagName !== 'stop') {
+          throw new JSXParserInvalidElementError(
+            state,
+            'Invalid child, ' + tagName,
+          );
+        }
+
+        state.tagName = tagName;
+
+        return await parsers[tagName](child.props, doc, state.copy());
       }),
     };
 
@@ -745,7 +1097,10 @@ export const parsers = {
 
   marker(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('marker');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -754,11 +1109,15 @@ export const parsers = {
   async mask(props: any, _: PDFDocument, state: JSXParserState) {
     // this is here until implementation verified
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('mask');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     const url = '#' + props.id;
     const mask: Mask = {
+      type: 'mask',
       x: parseFloat(props.x),
       y: parseFloat(props.y),
       width: parseFloat(props.width),
@@ -775,39 +1134,42 @@ export const parsers = {
 
   metadata(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('metadata');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
   },
 
   path(props: any, _: PDFDocument, state: JSXParserState) {
-    const attr = attributes(props, state.css, props.style);
+    const a = attributes(props, state.css, props.style);
 
     const shape: Shape = {
       type: 'shape',
       operators: path(props.d),
-      mask: mask(state.defs, attr.mask),
-      filter: filter(state.defs, attr.filter),
-      clipPath: clipPath(state.defs, attr.clipPath),
-      clipRule: attr.clipRule,
-      fill: color(state.defs, attr.fill, {
+      mask: mask(state, a.mask),
+      filter: filter(state, a.filter),
+      clipPath: clipPath(state, a.clipPath),
+      clipRule: a.clipRule,
+      fill: color(state, a.fill, {
         type: ColorTypes.RGB,
         red: 0,
         green: 0,
         blue: 0,
       } as RGB),
-      fillRule: attr.fillRule,
-      stroke: color(state.defs, attr.stroke),
-      strokeWidth: attr.strokeWidth,
-      strokeLineJoin: attr.strokeLineJoin,
-      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
-      strokeLineCap: attr.strokeLineCap,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: parseFloat(attr.strokeDashOffset),
-      fillOpacity: opacity(attr.fillOpacity, attr.opacity),
-      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
-      mixBlendMode: mixBlendMode(attr.mixBlendMode),
+      fillRule: a.fillRule,
+      stroke: color(state, a.stroke),
+      strokeWidth: a.strokeWidth,
+      strokeLineJoin: a.strokeLineJoin,
+      strokeMiterLimit: parseFloat(a.strokeMiterLimit),
+      strokeLineCap: a.strokeLineCap,
+      strokeDashArray: a.strokeDashArray,
+      strokeDashOffset: parseFloat(a.strokeDashOffset),
+      fillOpacity: opacity(a.fillOpacity, a.opacity),
+      strokeOpacity: opacity(a.strokeOpacity, a.opacity),
+      mixBlendMode: mixBlendMode(a.mixBlendMode),
       transform: transform(props.transform),
     };
 
@@ -816,39 +1178,42 @@ export const parsers = {
 
   pattern(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('pattern');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
   },
 
   polygon(props: any, _: PDFDocument, state: JSXParserState) {
-    const attr = attributes(props, state.css, props.style);
+    const a = attributes(props, state.css, props.style);
 
     const shape: Shape = {
       type: 'shape',
       operators: polygon(props.points),
-      mask: mask(state.defs, attr.mask),
-      filter: filter(state.defs, attr.filter),
-      clipPath: clipPath(state.defs, attr.clipPath),
-      clipRule: attr.clipRule,
-      fill: color(state.defs, attr.fill, {
+      mask: mask(state, a.mask),
+      filter: filter(state, a.filter),
+      clipPath: clipPath(state, a.clipPath),
+      clipRule: a.clipRule,
+      fill: color(state, a.fill, {
         type: ColorTypes.RGB,
         red: 0,
         green: 0,
         blue: 0,
       } as RGB),
-      fillRule: attr.fillRule,
-      fillOpacity: opacity(attr.fillOpacity, attr.opacity),
-      stroke: color(state.defs, attr.stroke),
-      strokeWidth: attr.strokeWidth,
-      strokeLineJoin: attr.strokeLineJoin,
-      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
-      strokeLineCap: attr.strokeLineCap,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: parseFloat(attr.strokeDashOffset),
-      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
-      mixBlendMode: mixBlendMode(attr.mixBlendMode),
+      fillRule: a.fillRule,
+      fillOpacity: opacity(a.fillOpacity, a.opacity),
+      stroke: color(state, a.stroke),
+      strokeWidth: a.strokeWidth,
+      strokeLineJoin: a.strokeLineJoin,
+      strokeMiterLimit: parseFloat(a.strokeMiterLimit),
+      strokeLineCap: a.strokeLineCap,
+      strokeDashArray: a.strokeDashArray,
+      strokeDashOffset: parseFloat(a.strokeDashOffset),
+      strokeOpacity: opacity(a.strokeOpacity, a.opacity),
+      mixBlendMode: mixBlendMode(a.mixBlendMode),
       transform: transform(props.transform),
     };
 
@@ -856,24 +1221,24 @@ export const parsers = {
   },
 
   polyline(props: any, _: PDFDocument, state: JSXParserState) {
-    const attr = attributes(props, state.css, props.style);
+    const a = attributes(props, state.css, props.style);
 
     const shape: Shape = {
       type: 'shape',
       operators: polyline(props.points),
-      mask: mask(state.defs, attr.mask),
-      filter: filter(state.defs, attr.filter),
-      clipPath: clipPath(state.defs, attr.clipPath),
-      clipRule: attr.clipRule,
-      stroke: color(state.defs, attr.stroke),
-      strokeWidth: attr.strokeWidth,
-      strokeLineJoin: attr.strokeLineJoin,
-      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
-      strokeLineCap: attr.strokeLineCap,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: parseFloat(attr.strokeDashOffset),
-      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
-      mixBlendMode: mixBlendMode(attr.mixBlendMode),
+      mask: mask(state, a.mask),
+      filter: filter(state, a.filter),
+      clipPath: clipPath(state, a.clipPath),
+      clipRule: a.clipRule,
+      stroke: color(state, a.stroke),
+      strokeWidth: a.strokeWidth,
+      strokeLineJoin: a.strokeLineJoin,
+      strokeMiterLimit: parseFloat(a.strokeMiterLimit),
+      strokeLineCap: a.strokeLineCap,
+      strokeDashArray: a.strokeDashArray,
+      strokeDashOffset: parseFloat(a.strokeDashOffset),
+      strokeOpacity: opacity(a.strokeOpacity, a.opacity),
+      mixBlendMode: mixBlendMode(a.mixBlendMode),
       transform: transform(props.transform),
     };
 
@@ -883,11 +1248,15 @@ export const parsers = {
   async radialGradient(props: any, doc: PDFDocument, state: JSXParserState) {
     // this is here until implementation verified
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('radialGradient');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     const url = '#' + props.id;
     const radialGradient: RadialGradient = {
+      type: 'radialGradient',
       cx: parseFloat(props.cx),
       cy: parseFloat(props.cy),
       r: parseFloat(props.r),
@@ -898,7 +1267,21 @@ export const parsers = {
       gradientTransform: props.gradientTransform,
       spreadMethod: props.spreadMethod,
       stops: await children(props.children, async (child) => {
-        return await this[child.tagName](child.props, doc, state);
+        if (typeof child === 'string') {
+          return;
+        }
+
+        const tagName = child.type.toString() as keyof JSXParsers;
+        if (tagName !== 'stop') {
+          throw new JSXParserInvalidElementError(
+            state,
+            'Invalid child, ' + tagName,
+          );
+        }
+
+        state.tagName = tagName;
+
+        return await parsers[tagName](child.props, doc, state.copy());
       }),
     };
 
@@ -908,7 +1291,7 @@ export const parsers = {
   },
 
   rect(props: any, _: PDFDocument, state: JSXParserState) {
-    const attr = attributes(props, state.css, props.style);
+    const a = attributes(props, state.css, props.style);
 
     const shape: Shape = {
       type: 'shape',
@@ -920,27 +1303,27 @@ export const parsers = {
         props.rx ? parseFloat(props.rx) : undefined,
         props.ry ? parseFloat(props.ry) : undefined,
       ),
-      mask: mask(state.defs, attr.mask),
-      filter: filter(state.defs, attr.filter),
-      clipPath: clipPath(state.defs, attr.clipPath),
-      clipRule: attr.clipRule,
-      fill: color(state.defs, attr.fill, {
+      mask: mask(state, a.mask),
+      filter: filter(state, a.filter),
+      clipPath: clipPath(state, a.clipPath),
+      clipRule: a.clipRule,
+      fill: color(state, a.fill, {
         type: ColorTypes.RGB,
         red: 0,
         green: 0,
         blue: 0,
       } as RGB),
-      fillRule: attr.fillRule,
-      fillOpacity: opacity(attr.fillOpacity, attr.opacity),
-      stroke: color(state.defs, attr.stroke),
-      strokeWidth: attr.strokeWidth,
-      strokeLineJoin: attr.strokeLineJoin,
-      strokeMiterLimit: parseFloat(attr.strokeMiterLimit),
-      strokeLineCap: attr.strokeLineCap,
-      strokeDashArray: attr.strokeDashArray,
-      strokeDashOffset: parseFloat(attr.strokeDashOffset),
-      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
-      mixBlendMode: mixBlendMode(attr.mixBlendMode),
+      fillRule: a.fillRule,
+      fillOpacity: opacity(a.fillOpacity, a.opacity),
+      stroke: color(state, a.stroke),
+      strokeWidth: a.strokeWidth,
+      strokeLineJoin: a.strokeLineJoin,
+      strokeMiterLimit: parseFloat(a.strokeMiterLimit),
+      strokeLineCap: a.strokeLineCap,
+      strokeDashArray: a.strokeDashArray,
+      strokeDashOffset: parseFloat(a.strokeDashOffset),
+      strokeOpacity: opacity(a.strokeOpacity, a.opacity),
+      mixBlendMode: mixBlendMode(a.mixBlendMode),
       transform: transform(props.transform),
     };
 
@@ -949,7 +1332,10 @@ export const parsers = {
 
   stop(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('stop');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -993,16 +1379,21 @@ export const parsers = {
         }
 
         if (!family) {
-          throw new SVGParserFontError('@font-face font-family not provided');
+          throw new JSXParsingError(
+            state,
+            '@font-face font-family not provided',
+          );
         }
 
         if (!weight) {
-          //TODO: implement weight defaults
-          throw new SVGParserFontError('@font-face font-weight not provided');
+          throw new JSXParsingError(
+            state,
+            '@font-face font-weight not provided',
+          );
         }
 
         if (!src) {
-          throw new SVGParserFontError('@font-face src not provided');
+          throw new JSXParsingError(state, '@font-face src not provided');
         }
 
         if (!style) {
@@ -1050,20 +1441,24 @@ export const parsers = {
   },
 
   async svg(props: any, doc: PDFDocument, state: JSXParserState) {
-    const attr = attributes(props, state.css, props.style);
+    const a = attributes(props, state.css, props.style);
 
     const group: Group = {
       type: 'group',
-      mask: mask(state.defs, attr.mask),
-      filter: filter(state.defs, attr.filter),
-      clipPath: clipPath(state.defs, attr.clipPath),
-      clipRule: attr.clipRule,
-      fillOpacity: opacity(attr.fillOpacity, attr.opacity),
-      strokeOpacity: opacity(attr.strokeOpacity, attr.opacity),
-      mixBlendMode: mixBlendMode(attr.mixBlendMode),
+      mask: mask(state, a.mask),
+      filter: filter(state, a.filter),
+      clipPath: clipPath(state, a.clipPath),
+      clipRule: a.clipRule,
+      fillOpacity: opacity(a.fillOpacity, a.opacity),
+      strokeOpacity: opacity(a.strokeOpacity, a.opacity),
+      mixBlendMode: mixBlendMode(a.mixBlendMode),
       transform: transform(props.transform),
       children: await children(props.children, async (child) => {
-        return await this[child.tagName](child.props, doc, state);
+        if (typeof child === 'string') {
+          return;
+        }
+
+        return await parseJsx(child, doc, state);
       }),
     };
 
@@ -1072,114 +1467,114 @@ export const parsers = {
 
   symbol(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('symbol');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
   },
 
   async text(props: any, doc: PDFDocument, state: JSXParserState) {
-    const attr = attributes(props, state.css, props.style);
+    const a = attributes(props, state.css, props.style);
 
-    console.log(attr);
+    // if (!state.attributes.font) {
+    //   throw new Error();
+    // }
 
-    console.log(state.fonts);
-
-    const text: Text = {
-      type: 'text',
-      font: attr.fontFamily
-        ? await font(
-            state.fonts,
-            attr.fontFamily,
-            attr.fontWeight,
-            attr.fontStyle,
-          )
-        : await doc.embedFont(StandardFonts.Helvetica),
-      //   children: await children(props.children, async (child) => {
-      //     if (child.tagName !== 'tspan' && child.tagName !== 'textPath') {
-      //       throw new Error('Invalid SVG');
-      //     }
-
-      //     return await this[child.tagName](child.props, doc, state);
-      //   }),
-    };
-
-    return definedKeysOf(text);
-  },
-
-  async textPath(props: any, doc: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('textPath');
-    }
-
-    const attr = attributes(props, state.css, props.style);
-
-    console.log(attr);
-
-    console.log(state.fonts);
+    state.font(a.fontFamily, a.fontWeight, a.fontStyle, parseInt(a.fontSize));
+    state.fill(a.fill);
 
     const text: Text = {
       type: 'text',
-      font: attr.fontFamily
-        ? await font(
-            state.fonts,
-            attr.fontFamily,
-            attr.fontWeight,
-            attr.fontStyle,
-          )
-        : await doc.embedFont(StandardFonts.Helvetica),
-      children: await children(props.children, async (child) => {
-        if (child.tagName !== 'tspan' && child.tagName !== 'textPath') {
-          throw new Error('Invalid SVG');
+      fill: state.attributes.fill,
+      fontSize: state.attributes.fontSize,
+      font: state.attributes.font,
+      transform: transform(props.transform),
+      segments: await children(props.children, async (child) => {
+        if (typeof child === 'string') {
+          return child;
         }
 
-        return await this[child.tagName](child.props, doc, state);
+        const tagName = child.type.toString() as keyof JSXParsers;
+        if (tagName !== 'tspan' && tagName !== 'textPath') {
+          throw new JSXParserInvalidElementError(
+            state,
+            'Invalid child, ' + tagName,
+          );
+        }
+
+        state.tagName = tagName;
+
+        return await parsers[tagName](child.props, doc, state.copy());
       }),
     };
 
     return definedKeysOf(text);
   },
 
+  async textPath(_: any, __: PDFDocument, state: JSXParserState) {
+    if (state.throwOnInvalidElement) {
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
+    }
+
+    return undefined;
+  },
+
   title(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('title');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
   },
 
   async tspan(props: any, doc: PDFDocument, state: JSXParserState) {
-    const attr = attributes(props, state.css, props.style);
+    const a = attributes(props, state.css, props.style);
 
-    console.log(attr);
+    state.font(a.fontFamily, a.fontWeight, a.fontStyle, parseInt(a.fontSize));
+    state.fill(a.fill);
 
     const text: Text = {
       type: 'text',
-      font: attr.fontFamily
-        ? await font(
-            state.fonts,
-            attr.fontFamily,
-            attr.fontWeight,
-            attr.fontStyle,
-          )
-        : await doc.embedFont(StandardFonts.Helvetica),
-      children: await children(props.children, async (child) => {
-        if (child.tagName !== 'tspan' && child.tagName !== 'textPath') {
-          throw new Error('Invalid SVG');
+      fill: state.attributes.fill,
+      fontSize: state.attributes.fontSize,
+      font: state.attributes.font,
+      segments: await children(props.children, async (child) => {
+        if (typeof child === 'string') {
+          return child;
         }
 
-        return await this[child.tagName](child.props, doc, state);
+        const tagName = child.type.toString() as keyof JSXParsers;
+        if (tagName !== 'tspan' && tagName !== 'textPath') {
+          throw new JSXParserInvalidElementError(
+            state,
+            'Invalid child, ' + tagName,
+          );
+        }
+
+        state.tagName = tagName;
+
+        return await parsers[tagName](child.props, doc, state.copy());
       }),
     };
-
-    console.log(text);
 
     return definedKeysOf(text);
   },
 
   async use(_: any, __: PDFDocument, state: JSXParserState) {
     if (state.throwOnInvalidElement) {
-      throw new SVGParserNotSupportedError('use');
+      throw new JSXParserInvalidElementError(
+        state,
+        'Parser for element not supported',
+      );
     }
 
     return undefined;
@@ -1194,4 +1589,20 @@ export const parsers = {
   },
 };
 
-export default parsers;
+export default async function parseJsx(
+  element: JSX.Element,
+  doc: PDFDocument,
+  state: JSXParserState,
+) {
+  const tagName = element.type.toString() as keyof JSXParsers;
+  if (typeof parsers[tagName] !== 'function') {
+    throw new JSXParserInvalidElementError(
+      state,
+      'Parser for element not found',
+    );
+  }
+
+  state.tagName = tagName;
+
+  return await parsers[tagName](element.props, doc, state);
+}

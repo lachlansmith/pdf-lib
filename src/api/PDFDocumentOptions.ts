@@ -1,6 +1,12 @@
 import { EmbeddedFileOptions } from 'src/core/embedders/FileEmbedder';
 import { TypeFeatures } from 'src/types/fontkit';
-import PDFFont from './PDFFont';
+import {
+  Fonts,
+  JSXParserState,
+  Css,
+  Defs,
+  Attributes,
+} from 'src/api/JSXParser';
 
 export enum ParseSpeeds {
   Fastest = Infinity,
@@ -34,12 +40,13 @@ export interface CreateOptions {
   updateMetadata?: boolean;
 }
 
-export interface FromOptions {
-  throwOnInvalidElement?: boolean;
+export interface OfOptions {
   updateMetadata?: boolean;
-  fonts?: {
-    [family: string]: { [weight: string]: { [style: string]: PDFFont } };
-  };
+  css?: Css;
+  defs?: Defs;
+  fonts?: Fonts;
+  attributes?: Attributes;
+  throwOnInvalidElement?: boolean;
 }
 
 export interface EmbedFontOptions {
@@ -53,8 +60,6 @@ export interface SetTitleOptions {
 }
 
 export interface EmbedJsxOptions {
-  fonts?: {
-    [family: string]: { [weight: string]: { [style: string]: PDFFont } };
-  };
+  state?: JSXParserState;
   throwOnInvalidElement?: boolean;
 }
