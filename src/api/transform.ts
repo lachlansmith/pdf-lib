@@ -47,8 +47,8 @@ export const skewX = (skx: number | PDFNumber) =>
 export const skewY = (sky: number | PDFNumber) =>
   concatTransformationMatrix(1, 0, Math.tan(asNumber(sky)), 1, 0, 0);
 
-export const transform = (str?: string): PDFOperator[] | undefined => {
-  if (!str) return;
+export const transform = (str?: string) => {
+  if (!str) return [];
   const ops: (PDFOperator | undefined)[] = [];
 
   str = str.split(' ').join(',');

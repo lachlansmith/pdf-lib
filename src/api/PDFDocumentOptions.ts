@@ -1,12 +1,6 @@
 import { EmbeddedFileOptions } from 'src/core/embedders/FileEmbedder';
 import { TypeFeatures } from 'src/types/fontkit';
-import {
-  Fonts,
-  JSXParserState,
-  Css,
-  Defs,
-  Attributes,
-} from 'src/api/JSXParser';
+import { Css, Defs, Fonts, Attributes } from 'src/api/JSXParserState';
 
 export enum ParseSpeeds {
   Fastest = Infinity,
@@ -47,6 +41,8 @@ export interface OfOptions {
   fonts?: Fonts;
   attributes?: Attributes;
   throwOnInvalidElement?: boolean;
+  throwOnInvalidAttribute?: boolean;
+  outlineText?: boolean;
 }
 
 export interface EmbedFontOptions {
@@ -60,6 +56,11 @@ export interface SetTitleOptions {
 }
 
 export interface EmbedJsxOptions {
-  state?: JSXParserState;
+  css?: Css;
+  defs?: Defs;
+  fonts?: Fonts;
+  attributes?: Attributes;
   throwOnInvalidElement?: boolean;
+  throwOnInvalidAttribute?: boolean;
+  outlineText?: boolean;
 }

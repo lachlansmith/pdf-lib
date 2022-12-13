@@ -3,13 +3,13 @@ import ColorParser from 'color';
 import { camel } from 'src/utils';
 import { BlendMode } from 'src/api/PDFPageOptions';
 import {
-  JSXParserState,
   RadialGradient,
   LinearGradient,
   Filter,
   Mask,
   ClipPath,
 } from 'src/api/JSXParser';
+import JSXParserState from 'src/api/JSXParserState';
 
 export const attributes = (
   presentationAttributes: any,
@@ -76,11 +76,22 @@ export const color = (
   };
 };
 
-export const opacity = (fillOrStrokeOpacity?: string, opacity?: string) => {
+export const opacity = <T extends string | number>(
+  fillOrStrokeOpacity?: T,
+  opacity?: T,
+): T | undefined => {
+  if (typeof fillOrStrokeOpacity === 'string' && typeof opacity === 'string') {
+    return (fillOrStrokeOpacity
+      ? parseFloat(fillOrStrokeOpacity)
+      : opacity
+      ? parseFloat(opacity)
+      : undefined) as T;
+  }
+
   return fillOrStrokeOpacity
-    ? parseFloat(fillOrStrokeOpacity)
+    ? fillOrStrokeOpacity
     : opacity
-    ? parseFloat(opacity)
+    ? opacity
     : undefined;
 };
 

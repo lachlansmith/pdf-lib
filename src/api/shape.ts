@@ -11,7 +11,6 @@ import {
   moveTo,
 } from 'src/api/operators';
 import { PDFOperator } from 'src/core';
-import { Shape, Group } from 'src/api/JSXParser';
 
 let cx: number = 0;
 let cy: number = 0;
@@ -487,12 +486,49 @@ const segmentToBezier = (
   return result;
 };
 
-export const path = (d: string): PDFOperator[] => apply(parse(d));
+export const path = (d: string) => apply(parse(d));
 
-export const polygon = (points: string): PDFOperator[] =>
-  path('M' + points + 'z');
+const poly = (points: string | [number, number][]) => {
+  let pairs: [number, number][] = [];
+  if (points instanceof Array) {
+    pairs = points;
+  } else {
+    const pointsArray = points
+      .trim()
+      .split(' ')
+      .reduce((arr: string[], point: string) => {
+        return [
+          ...arr,
+          ...(point.includes(',')
+            ? point.split(',')
+            : point.trim() !== ''
+            ? [point]
+            : []),
+        ];
+      }, []);
 
-export const polyline = (points: string): PDFOperator[] => path('M' + points);
+    while (pointsArray.length) {
+      pairs.push(
+        pointsArray.splice(0, 2).map((coord) => parseFloat(coord)) as [
+          number,
+          number,
+        ],
+      );
+    }
+  }
+
+  return pairs.map(([x, y], i) => {
+    return i === 0 ? moveTo(x, y) : lineTo(x, y);
+  });
+};
+
+export const polygon = (points: string | [number, number][]) => {
+  const ops = poly(points);
+  ops.push(closePath());
+  return ops;
+};
+
+export const polyline = (points: string | [number, number][]) => poly(points);
 
 export const rect = (
   x: number,
@@ -501,7 +537,7 @@ export const rect = (
   height: number,
   rx?: number,
   ry?: number,
-): PDFOperator[] => {
+) => {
   const X = x;
   const Y = y;
   const W = width;
@@ -526,123 +562,84 @@ export const rect = (
   if (RY > H / 2) {
     RY = H / 2;
   }
-  //   const hasCurves = RX > 0 && RY > 0;
-
-  RX = 0;
-  RY = 0;
+  const hasCurves = RX > 0 && RY > 0;
 
   const ops: PDFOperator[] = [];
 
-  ops.push(moveTo(X + RX, Y), lineTo(X + W - RX, Y));
-  //   if (hasCurves) {
-  //     const operators = solveArc(X + W, Y + RY, [RX, RY, 0, 0, 1, X + W, Y + RY]);
-  //     operators.forEach((o) => ops.push(o));
-  //   }
-  ops.push(lineTo(X + W - RX, Y + H - RY));
-  //   if (hasCurves) {
-  //     const operators = solveArc(X + W - RX, Y + H, [
-  //       RX,
-  //       RY,
-  //       0,
-  //       0,
-  //       1,
-  //       X + W - RX,
-  //       Y + H,
-  //     ]);
-  //     operators.forEach((o) => ops.push(o));
-  //   }
-  ops.push(lineTo(X + RX, Y + H - RY));
-  //   if (hasCurves) {
-  //     const operators = solveArc(X, Y + H - RY, [RX, RY, 0, 0, 1, X, Y + H - RY]);
-  //     operators.forEach((o) => ops.push(o));
-  //   }
-  ops.push(lineTo(X + RX, Y + RY));
-  //   if (hasCurves) {
-  //     const operators = solveArc(X + RX, Y, [RX, RY, 0, 0, 1, X + RX, Y]);
-  //     operators.forEach((o) => ops.push(o));
-  //   }
+  ops.push(moveTo(X + RX, Y));
+  ops.push(lineTo(X + W - RX, Y));
+  if (hasCurves) {
+    const operators = solveArc(X + W - RX, Y, [RX, RY, 0, 0, 1, X + W, Y + RY]);
+    operators.forEach((o) => ops.push(o));
+  }
+  ops.push(lineTo(X + W, Y + H - RY));
+  if (hasCurves) {
+    const operators = solveArc(X + W, Y + H - RY, [
+      RX,
+      RY,
+      0,
+      0,
+      1,
+      X + W - RX,
+      Y + H,
+    ]);
+    operators.forEach((o) => ops.push(o));
+  }
+  ops.push(lineTo(X + RX, Y + H));
+  if (hasCurves) {
+    const operators = solveArc(X + RX, Y + H, [RX, RY, 0, 0, 1, X, Y + H - RY]);
+    operators.forEach((o) => ops.push(o));
+  }
+  ops.push(lineTo(X, Y + RY));
+  if (hasCurves) {
+    const operators = solveArc(X, Y + RY, [RX, RY, 0, 0, 1, X + RX, Y]);
+    operators.forEach((o) => ops.push(o));
+  }
   ops.push(closePath());
 
   return ops.filter(Boolean) as PDFOperator[];
 };
 
-export const arc = (options: {
-  x: number;
-  y: number;
-  rx: number;
-  ry: number;
-  rot: number;
-  large: number;
-  sweep: number;
-  ex: number;
-  ey: number;
-}) =>
-  [
-    moveTo(options.x, options.y),
-    ...solveArc(options.x, options.y, [
-      options.rx,
-      options.ry,
-      options.rot,
-      options.large,
-      options.sweep,
-      options.ex + options.x,
-      options.ey + options.y,
-    ]),
-    closePath(),
-  ].filter(Boolean) as PDFOperator[];
-
-export const ellipse = (
-  x: number,
-  y: number,
+export const arc = (
+  x: number, // start at x
+  y: number, // start at y
   rx: number,
   ry: number,
-): PDFOperator[] =>
-  arc({
-    x,
-    y: y - ry,
-    rx,
-    ry,
-    rot: 0,
-    large: 1,
-    sweep: 0,
-    ex: 1,
-    ey: 0,
-  });
-
-export const circle = (x: number, y: number, r: number): PDFOperator[] =>
-  arc({
-    x,
-    y: y - r,
-    rx: r,
-    ry: r,
-    rot: 0,
-    large: 1,
-    sweep: 0,
-    ex: 1,
-    ey: 0,
-  });
-
-export const line = (
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-): PDFOperator[] => [moveTo(x1, y1), lineTo(x2, y2), closePath()];
-
-export const shape = (s: Shape | Group): PDFOperator[] => {
+  rot: number,
+  large: number,
+  sweep: number,
+  ex: number, // end at ex
+  ey: number, // end at ey
+  close?: boolean,
+) => {
   const ops: (PDFOperator | undefined)[] = [];
-  switch (s.type) {
-    case 'group':
-      s.children.forEach(
-        (g) =>
-          (g.type === 'shape' || g.type === 'group') && ops.push(...shape(g)),
-      );
-      break;
-    case 'shape':
-      ops.push(...s.operators);
-      break;
-    default:
-      throw new Error('Graphic is not a shape');
-  }
+
+  ops.push(moveTo(x, y));
+  solveArc(x, y, [rx, ry, rot, large, sweep, ex + x, ey + y]).forEach((op) =>
+    ops.push(op),
+  );
+
+  if (close) ops.push(closePath());
+
+  return ops.filter(Boolean) as PDFOperator[];
+};
+
+export const ellipse = (cx: number, cy: number, rx: number, ry: number) =>
+  arc(cx, cy - ry, rx, ry, 0, 1, 0, 1, 0, true);
+
+export const circle = (cx: number, cy: number, r: number) =>
+  arc(cx, cy - r, r, r, 0, 1, 0, 1, 0, true);
+
+export const line = (x1: number, y1: number, x2: number, y2: number) => [
+  moveTo(x1, y1),
+  lineTo(x2, y2),
+  closePath(),
+];
+
+export const shape = (shapes: PDFOperator[][]) => {
+  const ops: (PDFOperator | undefined)[] = [];
+
+  shapes.forEach((shape) => shape.forEach((op) => ops.push(op)));
+
   return ops.filter(Boolean) as PDFOperator[];
 };

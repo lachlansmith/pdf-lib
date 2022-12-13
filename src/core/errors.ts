@@ -1,5 +1,5 @@
 // tslint:disable: max-classes-per-file
-import { JSXParserState } from 'src/api/JSXParser';
+import JSXParserState from 'src/api/JSXParserState';
 import PDFObject from 'src/core/objects/PDFObject';
 import { arrayAsString } from 'src/utils';
 
@@ -246,6 +246,7 @@ export enum Invalid {
   fontFamily = 'fontFamily',
   fontWeight = 'fontWeight',
   fontStyle = 'fontStyle',
+  font = 'font',
 }
 
 export class JSXParserInvalidAttributeError extends JSXParsingError {
@@ -257,6 +258,8 @@ export class JSXParserInvalidAttributeError extends JSXParsingError {
       case Invalid.fontWeight:
         break;
       case Invalid.fontStyle:
+        break;
+      case Invalid.font:
         break;
     }
 

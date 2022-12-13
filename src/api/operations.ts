@@ -29,13 +29,23 @@ import {
   endMarkedContent,
   clip,
   endPath,
+  LineJoinStyle,
 } from 'src/api/operators';
 import { Color, setFillingColor, setStrokingColor } from 'src/api/colors';
 import { Rotation, degrees, toRadians } from 'src/api/rotations';
-import { path, line, circle, ellipse, rect } from 'src/api/shape';
+import {
+  line,
+  polyline,
+  arc,
+  circle,
+  ellipse,
+  rect,
+  path,
+  polygon,
+} from 'src/api/shape';
 import { PDFHexString, PDFName, PDFNumber, PDFOperator } from 'src/core';
 import { asNumber } from 'src/api/objects';
-import { translate, scale } from 'src/api/transform';
+import { translate, scale, skew, matrix, transform } from 'src/api/transform';
 import { Shape, Text, Image, Group } from 'src/api/JSXParser';
 import PDFPage from 'src/api/PDFPage';
 // import { breakTextIntoLines, cleanText, lineSplit } from 'src/utils';
@@ -161,81 +171,183 @@ export const drawPage = (
   ].filter(Boolean) as PDFOperator[];
 
 export const drawLine = (options: {
-  x1: number | PDFNumber;
-  y1: number | PDFNumber;
-  x2: number | PDFNumber;
-  y2: number | PDFNumber;
-  stroke: Color | undefined;
-  strokeWidth: number | PDFNumber;
-  strokeDashArray?: (number | PDFNumber)[];
-  strokeDashPhase?: number | PDFNumber;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
+  stroke?: Color;
+  strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
+  strokeDashArray?: number[];
+  strokeDashOffset?: number;
   strokeLineCap?: LineCapStyle;
   graphicsState?: string | PDFName;
-}) =>
-  [
+}) => {
+  const ops = [
     pushGraphicsState(),
-    options.graphicsState && setGraphicsState(options.graphicsState),
+    options.graphicsState ? setGraphicsState(options.graphicsState) : undefined,
 
-    options.stroke && setStrokingColor(options.stroke),
-    options.strokeWidth && setLineWidth(options.strokeWidth),
-    options.strokeLineCap && setLineCap(options.strokeLineCap),
-    (options.strokeDashArray || options.strokeDashPhase) &&
-      setDashPattern(
-        options.strokeDashArray ?? [],
-        options.strokeDashPhase ?? 0,
-      ),
+    options.translate
+      ? options.translate instanceof Array
+        ? translate(options.translate[0], options.translate[1])
+        : translate(options.translate, 0)
+      : undefined,
 
-    ...line(
-      asNumber(options.x1),
-      asNumber(options.y1),
-      asNumber(options.x2),
-      asNumber(options.y2),
-    ),
+    ...(options.rotate
+      ? options.rotate instanceof Array
+        ? [
+            translate(options.rotate[1][0], options.rotate[1][1]),
+            rotateRadians(toRadians(options.rotate[0])),
+            translate(-options.rotate[1][0], -options.rotate[1][1]),
+          ]
+        : [rotateRadians(toRadians(options.rotate))]
+      : []),
 
-    options.stroke ? stroke() : undefined,
+    options.skew
+      ? options.skew instanceof Array
+        ? skew(options.skew[0], options.skew[1])
+        : skew(options.skew, options.skew)
+      : undefined,
 
-    popGraphicsState(),
-  ].filter(Boolean) as PDFOperator[];
+    options.scale
+      ? options.scale instanceof Array
+        ? scale(options.scale[0], options.scale[1])
+        : scale(options.scale, options.scale)
+      : undefined,
+
+    options.matrix ? matrix(...options.matrix) : undefined,
+    ...(options.transform ? transform(options.transform) : []),
+
+    options.stroke ? setStrokingColor(options.stroke as Color) : undefined,
+    options.strokeWidth ? setLineWidth(options.strokeWidth) : undefined,
+    options.strokeLineJoin ? setLineJoin(options.strokeLineJoin) : undefined,
+    options.strokeMiterLimit
+      ? setLineMiterLimit(options.strokeMiterLimit)
+      : undefined,
+    options.strokeLineCap ? setLineCap(options.strokeLineCap) : undefined,
+    options.strokeDashArray || options.strokeDashOffset
+      ? setDashPattern(
+          options.strokeDashArray ?? [],
+          options.strokeDashOffset ?? 0,
+        )
+      : undefined,
+  ];
+
+  if (options.clipPath) {
+    options.clipPath.forEach((op) => ops.push(op));
+    ops.push(clip(options.clipRule), endPath());
+  }
+
+  line(options.x1, options.y1, options.x2, options.y2).forEach((op) =>
+    ops.push(op),
+  );
+
+  ops.push(options.stroke ? stroke() : undefined, popGraphicsState());
+
+  return ops.filter(Boolean) as PDFOperator[];
+};
 
 export const drawRect = (options: {
-  x: number | PDFNumber;
-  y: number | PDFNumber;
-  width: number | PDFNumber;
-  height: number | PDFNumber;
-  rx?: number | PDFNumber;
-  ry?: number | PDFNumber;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rx?: number;
+  ry?: number;
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
   fill?: Color;
   fillRule?: 'nonzero' | 'evenodd';
   stroke?: Color;
-  strokeWidth?: number | PDFNumber;
+  strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
+  strokeDashArray?: number[];
+  strokeDashOffset?: number;
   strokeLineCap?: LineCapStyle;
-  strokeDashArray?: (number | PDFNumber)[];
-  strokeDashPhase?: number | PDFNumber;
   graphicsState?: string | PDFName;
-}) =>
-  [
+}) => {
+  const ops = [
     pushGraphicsState(),
-    options.graphicsState && setGraphicsState(options.graphicsState),
+    options.graphicsState ? setGraphicsState(options.graphicsState) : undefined,
 
-    options.fill && setFillingColor(options.fill),
-    options.stroke && setStrokingColor(options.stroke),
-    options.strokeWidth && setLineWidth(options.strokeWidth),
-    options.strokeLineCap && setLineCap(options.strokeLineCap),
-    (options.strokeDashArray || options.strokeDashPhase) &&
-      setDashPattern(
-        options.strokeDashArray ?? [],
-        options.strokeDashPhase ?? 0,
-      ),
+    options.translate
+      ? options.translate instanceof Array
+        ? translate(options.translate[0], options.translate[1])
+        : translate(options.translate, 0)
+      : undefined,
 
-    ...rect(
-      asNumber(options.x),
-      asNumber(options.y),
-      asNumber(options.width),
-      asNumber(options.height),
-      options.rx ? asNumber(options.rx) : undefined,
-      options.ry ? asNumber(options.ry) : undefined,
-    ),
+    ...(options.rotate
+      ? options.rotate instanceof Array
+        ? [
+            translate(options.rotate[1][0], options.rotate[1][1]),
+            rotateRadians(toRadians(options.rotate[0])),
+            translate(-options.rotate[1][0], -options.rotate[1][1]),
+          ]
+        : [rotateRadians(toRadians(options.rotate))]
+      : []),
 
+    options.skew
+      ? options.skew instanceof Array
+        ? skew(options.skew[0], options.skew[1])
+        : skew(options.skew, options.skew)
+      : undefined,
+
+    options.scale
+      ? options.scale instanceof Array
+        ? scale(options.scale[0], options.scale[1])
+        : scale(options.scale, options.scale)
+      : undefined,
+
+    options.matrix ? matrix(...options.matrix) : undefined,
+    ...(options.transform ? transform(options.transform) : []),
+
+    options.fill ? setFillingColor(options.fill) : undefined,
+    options.stroke ? setStrokingColor(options.stroke as Color) : undefined,
+    options.strokeWidth ? setLineWidth(options.strokeWidth) : undefined,
+    options.strokeLineJoin ? setLineJoin(options.strokeLineJoin) : undefined,
+    options.strokeMiterLimit
+      ? setLineMiterLimit(options.strokeMiterLimit)
+      : undefined,
+    options.strokeLineCap ? setLineCap(options.strokeLineCap) : undefined,
+    options.strokeDashArray || options.strokeDashOffset
+      ? setDashPattern(
+          options.strokeDashArray ?? [],
+          options.strokeDashOffset ?? 0,
+        )
+      : undefined,
+  ];
+
+  if (options.clipPath) {
+    options.clipPath.forEach((op) => ops.push(op));
+    ops.push(clip(options.clipRule), endPath());
+  }
+
+  rect(
+    options.x,
+    options.y,
+    options.width,
+    options.height,
+    options.rx ? options.rx : undefined,
+    options.ry ? options.ry : undefined,
+  ).forEach((op) => ops.push(op));
+
+  ops.push(
     // prettier-ignore
     options.fill && options.stroke ? fillAndStroke(options.fillRule)
       : options.fill               ? fill(options.fillRule)
@@ -243,123 +355,482 @@ export const drawRect = (options: {
       : undefined,
 
     popGraphicsState(),
-  ].filter(Boolean) as PDFOperator[];
+  );
+
+  return ops.filter(Boolean) as PDFOperator[];
+};
+
+export const drawArc = (options: {
+  x: number; // start at x
+  y: number; // start at y
+  rx: number;
+  ry: number;
+  rot: number;
+  large: number;
+  sweep: number;
+  ex: number; // end at ex
+  ey: number; // end at ey
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
+  fill?: Color;
+  fillRule?: 'nonzero' | 'evenodd';
+  stroke?: Color;
+  strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
+  strokeDashArray?: number[];
+  strokeDashOffset?: number;
+  strokeLineCap?: LineCapStyle;
+  graphicsState?: string | PDFName;
+}) => {
+  const ops = [
+    pushGraphicsState(),
+    options.graphicsState ? setGraphicsState(options.graphicsState) : undefined,
+
+    options.translate
+      ? options.translate instanceof Array
+        ? translate(options.translate[0], options.translate[1])
+        : translate(options.translate, 0)
+      : undefined,
+
+    ...(options.rotate
+      ? options.rotate instanceof Array
+        ? [
+            translate(options.rotate[1][0], options.rotate[1][1]),
+            rotateRadians(toRadians(options.rotate[0])),
+            translate(-options.rotate[1][0], -options.rotate[1][1]),
+          ]
+        : [rotateRadians(toRadians(options.rotate))]
+      : []),
+
+    options.skew
+      ? options.skew instanceof Array
+        ? skew(options.skew[0], options.skew[1])
+        : skew(options.skew, options.skew)
+      : undefined,
+
+    options.scale
+      ? options.scale instanceof Array
+        ? scale(options.scale[0], options.scale[1])
+        : scale(options.scale, options.scale)
+      : undefined,
+
+    options.matrix ? matrix(...options.matrix) : undefined,
+    ...(options.transform ? transform(options.transform) : []),
+
+    options.fill ? setFillingColor(options.fill) : undefined,
+    options.stroke ? setStrokingColor(options.stroke as Color) : undefined,
+    options.strokeWidth ? setLineWidth(options.strokeWidth) : undefined,
+    options.strokeLineJoin ? setLineJoin(options.strokeLineJoin) : undefined,
+    options.strokeMiterLimit
+      ? setLineMiterLimit(options.strokeMiterLimit)
+      : undefined,
+    options.strokeLineCap ? setLineCap(options.strokeLineCap) : undefined,
+    options.strokeDashArray || options.strokeDashOffset
+      ? setDashPattern(
+          options.strokeDashArray ?? [],
+          options.strokeDashOffset ?? 0,
+        )
+      : undefined,
+  ];
+
+  if (options.clipPath) {
+    options.clipPath.forEach((op) => ops.push(op));
+    ops.push(clip(options.clipRule), endPath());
+  }
+
+  arc(
+    options.x, // start at x
+    options.y, // start at y
+    options.rx,
+    options.ry,
+    options.rot,
+    options.large,
+    options.sweep,
+    options.ex, // end at ex
+    options.ey, // end at ey
+  ).forEach((op) => ops.push(op));
+
+  ops.push(
+    // prettier-ignore
+    options.fill && options.stroke ? fillAndStroke(options.fillRule)
+        : options.fill               ? fill(options.fillRule)
+        : options.stroke             ? stroke()
+        : closePath(),
+
+    popGraphicsState(),
+  );
+  return ops.filter(Boolean) as PDFOperator[];
+};
 
 export const drawEllipse = (options: {
-  cx: number | PDFNumber;
-  cy: number | PDFNumber;
-  rx: number | PDFNumber;
-  ry: number | PDFNumber;
-  rotate?: Rotation;
-  origin?: [number | PDFNumber, number | PDFNumber];
+  cx: number;
+  cy: number;
+  rx: number;
+  ry: number;
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
   fill?: Color;
   fillRule?: 'nonzero' | 'evenodd';
   stroke?: Color;
-  strokeWidth?: number | PDFNumber;
-  strokeDashArray?: (number | PDFNumber)[];
-  strokeDashPhase?: number | PDFNumber;
+  strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
+  strokeDashArray?: number[];
+  strokeDashOffset?: number;
   strokeLineCap?: LineCapStyle;
   graphicsState?: string | PDFName;
-}) =>
-  [
+}) => {
+  const ops = [
     pushGraphicsState(),
-    options.graphicsState && setGraphicsState(options.graphicsState),
+    options.graphicsState ? setGraphicsState(options.graphicsState) : undefined,
 
-    options.fill && setFillingColor(options.fill),
-    options.stroke && setStrokingColor(options.stroke),
-    options.strokeWidth && setLineWidth(options.strokeWidth),
-    options.strokeLineCap && setLineCap(options.strokeLineCap),
-    (options.strokeDashArray || options.strokeDashPhase) &&
-      setDashPattern(
-        options.strokeDashArray ?? [],
-        options.strokeDashPhase ?? 0,
-      ),
+    options.translate
+      ? options.translate instanceof Array
+        ? translate(options.translate[0], options.translate[1])
+        : translate(options.translate, 0)
+      : undefined,
 
-    ...ellipse(
-      asNumber(options.cx),
-      asNumber(options.cy),
-      asNumber(options.rx),
-      asNumber(options.ry),
-    ),
+    ...(options.rotate
+      ? options.rotate instanceof Array
+        ? [
+            translate(options.rotate[1][0], options.rotate[1][1]),
+            rotateRadians(toRadians(options.rotate[0])),
+            translate(-options.rotate[1][0], -options.rotate[1][1]),
+          ]
+        : [rotateRadians(toRadians(options.rotate))]
+      : []),
 
+    options.skew
+      ? options.skew instanceof Array
+        ? skew(options.skew[0], options.skew[1])
+        : skew(options.skew, options.skew)
+      : undefined,
+
+    options.scale
+      ? options.scale instanceof Array
+        ? scale(options.scale[0], options.scale[1])
+        : scale(options.scale, options.scale)
+      : undefined,
+
+    options.matrix ? matrix(...options.matrix) : undefined,
+    ...(options.transform ? transform(options.transform) : []),
+
+    options.fill ? setFillingColor(options.fill) : undefined,
+    options.stroke ? setStrokingColor(options.stroke as Color) : undefined,
+    options.strokeWidth ? setLineWidth(options.strokeWidth) : undefined,
+    options.strokeLineJoin ? setLineJoin(options.strokeLineJoin) : undefined,
+    options.strokeMiterLimit
+      ? setLineMiterLimit(options.strokeMiterLimit)
+      : undefined,
+    options.strokeLineCap ? setLineCap(options.strokeLineCap) : undefined,
+    options.strokeDashArray || options.strokeDashOffset
+      ? setDashPattern(
+          options.strokeDashArray ?? [],
+          options.strokeDashOffset ?? 0,
+        )
+      : undefined,
+  ];
+
+  if (options.clipPath) {
+    options.clipPath.forEach((op) => ops.push(op));
+    ops.push(clip(options.clipRule), endPath());
+  }
+
+  ellipse(options.cx, options.cy, options.rx, options.ry).forEach((op) =>
+    ops.push(op),
+  );
+
+  ops.push(
     // prettier-ignore
     options.fill && options.stroke ? fillAndStroke(options.fillRule)
-  : options.fill                   ? fill(options.fillRule)
-  : options.stroke                 ? stroke()
-  : closePath(),
+      : options.fill               ? fill(options.fillRule)
+      : options.stroke             ? stroke()
+      : closePath(),
 
     popGraphicsState(),
-  ].filter(Boolean) as PDFOperator[];
+  );
+  return ops.filter(Boolean) as PDFOperator[];
+};
 
 export const drawCircle = (options: {
-  cx: number | PDFNumber;
-  cy: number | PDFNumber;
-  r: number | PDFNumber;
+  cx: number;
+  cy: number;
+  r: number;
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
   fill?: Color;
   fillRule?: 'nonzero' | 'evenodd';
   stroke?: Color;
-  strokeWidth?: number | PDFNumber;
-  strokeDashArray?: (number | PDFNumber)[];
-  strokeDashPhase?: number | PDFNumber;
+  strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
+  strokeDashArray?: number[];
+  strokeDashOffset?: number;
   strokeLineCap?: LineCapStyle;
   graphicsState?: string | PDFName;
-}) =>
-  [
+}) => {
+  const ops = [
     pushGraphicsState(),
-    options.graphicsState && setGraphicsState(options.graphicsState),
-    options.fill && setFillingColor(options.fill),
-    options.stroke && setStrokingColor(options.stroke),
-    options.strokeWidth && setLineWidth(options.strokeWidth),
-    options.strokeLineCap && setLineCap(options.strokeLineCap),
-    (options.strokeDashArray || options.strokeDashPhase) &&
-      setDashPattern(
-        options.strokeDashArray ?? [],
-        options.strokeDashPhase ?? 0,
-      ),
+    options.graphicsState ? setGraphicsState(options.graphicsState) : undefined,
 
-    ...circle(asNumber(options.cx), asNumber(options.cy), asNumber(options.r)),
+    options.translate
+      ? options.translate instanceof Array
+        ? translate(options.translate[0], options.translate[1])
+        : translate(options.translate, 0)
+      : undefined,
 
+    ...(options.rotate
+      ? options.rotate instanceof Array
+        ? [
+            translate(options.rotate[1][0], options.rotate[1][1]),
+            rotateRadians(toRadians(options.rotate[0])),
+            translate(-options.rotate[1][0], -options.rotate[1][1]),
+          ]
+        : [rotateRadians(toRadians(options.rotate))]
+      : []),
+
+    options.skew
+      ? options.skew instanceof Array
+        ? skew(options.skew[0], options.skew[1])
+        : skew(options.skew, options.skew)
+      : undefined,
+
+    options.scale
+      ? options.scale instanceof Array
+        ? scale(options.scale[0], options.scale[1])
+        : scale(options.scale, options.scale)
+      : undefined,
+
+    options.matrix ? matrix(...options.matrix) : undefined,
+    ...(options.transform ? transform(options.transform) : []),
+
+    options.fill ? setFillingColor(options.fill) : undefined,
+    options.stroke ? setStrokingColor(options.stroke as Color) : undefined,
+    options.strokeWidth ? setLineWidth(options.strokeWidth) : undefined,
+    options.strokeLineJoin ? setLineJoin(options.strokeLineJoin) : undefined,
+    options.strokeMiterLimit
+      ? setLineMiterLimit(options.strokeMiterLimit)
+      : undefined,
+    options.strokeLineCap ? setLineCap(options.strokeLineCap) : undefined,
+    options.strokeDashArray || options.strokeDashOffset
+      ? setDashPattern(
+          options.strokeDashArray ?? [],
+          options.strokeDashOffset ?? 0,
+        )
+      : undefined,
+  ];
+
+  if (options.clipPath) {
+    options.clipPath.forEach((op) => ops.push(op));
+    ops.push(clip(options.clipRule), endPath());
+  }
+
+  circle(options.cx, options.cy, options.r).forEach((op) => ops.push(op));
+
+  ops.push(
     // prettier-ignore
     options.fill && options.stroke ? fillAndStroke(options.fillRule)
-    : options.fill                 ? fill(options.fillRule)
-    : options.stroke               ? stroke()
-    : undefined,
+      : options.fill               ? fill(options.fillRule)
+      : options.stroke             ? stroke()
+      : undefined,
 
     popGraphicsState(),
-  ].filter(Boolean) as PDFOperator[];
+  );
+
+  return ops.filter(Boolean) as PDFOperator[];
+};
 
 export const drawPath = (options: {
   d: string;
-  rotate?: Rotation;
-  scale?: number | PDFNumber;
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
   fill?: Color;
   fillRule?: 'nonzero' | 'evenodd';
   stroke?: Color;
-  strokeWidth?: number | PDFNumber;
-  strokeDashArray?: (number | PDFNumber)[];
-  strokeDashPhase?: number | PDFNumber;
+  strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
+  strokeDashArray?: number[];
+  strokeDashOffset?: number;
   strokeLineCap?: LineCapStyle;
   graphicsState?: string | PDFName;
-}) =>
-  [
+}) => {
+  const ops = [
     pushGraphicsState(),
-    options.graphicsState && setGraphicsState(options.graphicsState),
+    options.graphicsState ? setGraphicsState(options.graphicsState) : undefined,
 
-    rotateRadians(toRadians(options.rotate ?? degrees(0))),
+    options.translate
+      ? options.translate instanceof Array
+        ? translate(options.translate[0], options.translate[1])
+        : translate(options.translate, 0)
+      : undefined,
 
-    options.scale && scale(options.scale, options.scale),
-    options.fill && setFillingColor(options.fill),
-    options.stroke && setStrokingColor(options.stroke),
-    options.strokeWidth && setLineWidth(options.strokeWidth),
-    options.strokeLineCap && setLineCap(options.strokeLineCap),
-    (options.strokeDashArray || options.strokeDashPhase) &&
-      setDashPattern(
-        options.strokeDashArray ?? [],
-        options.strokeDashPhase ?? 0,
-      ),
+    ...(options.rotate
+      ? options.rotate instanceof Array
+        ? [
+            translate(options.rotate[1][0], options.rotate[1][1]),
+            rotateRadians(toRadians(options.rotate[0])),
+            translate(-options.rotate[1][0], -options.rotate[1][1]),
+          ]
+        : [rotateRadians(toRadians(options.rotate))]
+      : []),
 
-    ...path(options.d),
+    options.skew
+      ? options.skew instanceof Array
+        ? skew(options.skew[0], options.skew[1])
+        : skew(options.skew, options.skew)
+      : undefined,
 
+    options.scale
+      ? options.scale instanceof Array
+        ? scale(options.scale[0], options.scale[1])
+        : scale(options.scale, options.scale)
+      : undefined,
+
+    options.matrix ? matrix(...options.matrix) : undefined,
+    ...(options.transform ? transform(options.transform) : []),
+
+    options.fill ? setFillingColor(options.fill) : undefined,
+    options.stroke ? setStrokingColor(options.stroke as Color) : undefined,
+    options.strokeWidth ? setLineWidth(options.strokeWidth) : undefined,
+    options.strokeLineJoin ? setLineJoin(options.strokeLineJoin) : undefined,
+    options.strokeMiterLimit
+      ? setLineMiterLimit(options.strokeMiterLimit)
+      : undefined,
+    options.strokeLineCap ? setLineCap(options.strokeLineCap) : undefined,
+    options.strokeDashArray || options.strokeDashOffset
+      ? setDashPattern(
+          options.strokeDashArray ?? [],
+          options.strokeDashOffset ?? 0,
+        )
+      : undefined,
+  ];
+
+  if (options.clipPath) {
+    options.clipPath.forEach((op) => ops.push(op));
+    ops.push(clip(options.clipRule), endPath());
+  }
+
+  path(options.d).forEach((op) => ops.push(op));
+
+  ops.push(
+    // prettier-ignore
+    options.fill && options.stroke ? fillAndStroke(options.fillRule)
+      : options.fill               ? fill(options.fillRule)
+      : options.stroke             ? stroke()
+      : undefined,
+
+    popGraphicsState(),
+  );
+
+  return ops.filter(Boolean) as PDFOperator[];
+};
+
+export const drawPolygon = (options: {
+  points: string | [number, number][];
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
+  fill?: Color;
+  fillRule?: 'nonzero' | 'evenodd';
+  stroke?: Color;
+  strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
+  strokeDashArray?: number[];
+  strokeDashOffset?: number;
+  strokeLineCap?: LineCapStyle;
+  graphicsState?: string | PDFName;
+}) => {
+  const ops = [
+    pushGraphicsState(),
+    options.graphicsState ? setGraphicsState(options.graphicsState) : undefined,
+
+    options.translate
+      ? options.translate instanceof Array
+        ? translate(options.translate[0], options.translate[1])
+        : translate(options.translate, 0)
+      : undefined,
+
+    ...(options.rotate
+      ? options.rotate instanceof Array
+        ? [
+            translate(options.rotate[1][0], options.rotate[1][1]),
+            rotateRadians(toRadians(options.rotate[0])),
+            translate(-options.rotate[1][0], -options.rotate[1][1]),
+          ]
+        : [rotateRadians(toRadians(options.rotate))]
+      : []),
+
+    options.skew
+      ? options.skew instanceof Array
+        ? skew(options.skew[0], options.skew[1])
+        : skew(options.skew, options.skew)
+      : undefined,
+
+    options.scale
+      ? options.scale instanceof Array
+        ? scale(options.scale[0], options.scale[1])
+        : scale(options.scale, options.scale)
+      : undefined,
+
+    options.matrix ? matrix(...options.matrix) : undefined,
+    ...(options.transform ? transform(options.transform) : []),
+
+    options.fill ? setFillingColor(options.fill) : undefined,
+    options.stroke ? setStrokingColor(options.stroke as Color) : undefined,
+    options.strokeWidth ? setLineWidth(options.strokeWidth) : undefined,
+    options.strokeLineJoin ? setLineJoin(options.strokeLineJoin) : undefined,
+    options.strokeMiterLimit
+      ? setLineMiterLimit(options.strokeMiterLimit)
+      : undefined,
+    options.strokeLineCap ? setLineCap(options.strokeLineCap) : undefined,
+    options.strokeDashArray || options.strokeDashOffset
+      ? setDashPattern(
+          options.strokeDashArray ?? [],
+          options.strokeDashOffset ?? 0,
+        )
+      : undefined,
+  ];
+
+  if (options.clipPath) {
+    options.clipPath.forEach((op) => ops.push(op));
+    ops.push(clip(options.clipRule), endPath());
+  }
+
+  polygon(options.points).forEach((op) => ops.push(op));
+
+  ops.push(
     // prettier-ignore
     options.fill && options.stroke ? fillAndStroke(options.fillRule)
         : options.fill             ? fill(options.fillRule)
@@ -367,43 +838,155 @@ export const drawPath = (options: {
         : undefined,
 
     popGraphicsState(),
-  ].filter(Boolean) as PDFOperator[];
+  );
+
+  return ops.filter(Boolean) as PDFOperator[];
+};
+
+export const drawPolyline = (options: {
+  points: string | [number, number][];
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
+  stroke?: Color;
+  strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
+  strokeDashArray?: number[];
+  strokeDashOffset?: number;
+  strokeLineCap?: LineCapStyle;
+  graphicsState?: string | PDFName;
+}) => {
+  const ops = [
+    pushGraphicsState(),
+    options.graphicsState ? setGraphicsState(options.graphicsState) : undefined,
+
+    options.translate
+      ? options.translate instanceof Array
+        ? translate(options.translate[0], options.translate[1])
+        : translate(options.translate, 0)
+      : undefined,
+
+    ...(options.rotate
+      ? options.rotate instanceof Array
+        ? [
+            translate(options.rotate[1][0], options.rotate[1][1]),
+            rotateRadians(toRadians(options.rotate[0])),
+            translate(-options.rotate[1][0], -options.rotate[1][1]),
+          ]
+        : [rotateRadians(toRadians(options.rotate))]
+      : []),
+
+    options.skew
+      ? options.skew instanceof Array
+        ? skew(options.skew[0], options.skew[1])
+        : skew(options.skew, options.skew)
+      : undefined,
+
+    options.scale
+      ? options.scale instanceof Array
+        ? scale(options.scale[0], options.scale[1])
+        : scale(options.scale, options.scale)
+      : undefined,
+
+    options.matrix ? matrix(...options.matrix) : undefined,
+    ...(options.transform ? transform(options.transform) : []),
+
+    options.stroke ? setStrokingColor(options.stroke as Color) : undefined,
+    options.strokeWidth ? setLineWidth(options.strokeWidth) : undefined,
+    options.strokeLineJoin ? setLineJoin(options.strokeLineJoin) : undefined,
+    options.strokeMiterLimit
+      ? setLineMiterLimit(options.strokeMiterLimit)
+      : undefined,
+    options.strokeLineCap ? setLineCap(options.strokeLineCap) : undefined,
+    options.strokeDashArray || options.strokeDashOffset
+      ? setDashPattern(
+          options.strokeDashArray ?? [],
+          options.strokeDashOffset ?? 0,
+        )
+      : undefined,
+  ];
+
+  if (options.clipPath) {
+    options.clipPath.forEach((op) => ops.push(op));
+    ops.push(clip(options.clipRule), endPath());
+  }
+
+  polyline(options.points).forEach((op) => ops.push(op));
+
+  ops.push(options.stroke ? stroke() : undefined, popGraphicsState());
+
+  return ops.filter(Boolean) as PDFOperator[];
+};
 
 export const draw = (
   g: Shape | Text | Image | Group,
   page: PDFPage,
   options: {
-    x: number | PDFNumber;
-    y: number | PDFNumber;
-    rotate: Rotation;
-    scale: number | PDFNumber;
+    rotate?: Rotation | [Rotation, [number, number]];
+    scale?: number | [number, number];
+    translate?: number | [number, number];
+    skew?: number | [number, number];
+    matrix?: [number, number, number, number, number, number];
+    transform?: string;
     clipPath?: PDFOperator[];
     clipRule?: 'nonzero' | 'evenodd';
     graphicsState?: string | PDFName;
   },
 ) => {
-  const operators: (PDFOperator | undefined)[] = [];
-  operators.push(
+  const ops = [
     pushGraphicsState(),
     options.graphicsState ? setGraphicsState(options.graphicsState) : undefined,
-    translate(options.x, options.y),
-    rotateRadians(toRadians(options.rotate)),
-    scale(options.scale, options.scale),
+
+    options.translate
+      ? options.translate instanceof Array
+        ? translate(options.translate[0], options.translate[1])
+        : translate(options.translate, 0)
+      : undefined,
+
+    ...(options.rotate
+      ? options.rotate instanceof Array
+        ? [
+            translate(options.rotate[1][0], options.rotate[1][1]),
+            rotateRadians(toRadians(options.rotate[0])),
+            translate(-options.rotate[1][0], -options.rotate[1][1]),
+          ]
+        : [rotateRadians(toRadians(options.rotate))]
+      : []),
+
+    options.skew
+      ? options.skew instanceof Array
+        ? skew(options.skew[0], options.skew[1])
+        : skew(options.skew, options.skew)
+      : undefined,
+
+    options.scale
+      ? options.scale instanceof Array
+        ? scale(options.scale[0], options.scale[1])
+        : scale(options.scale, options.scale)
+      : undefined,
+
+    options.matrix ? matrix(...options.matrix) : undefined,
+    ...(options.transform ? transform(options.transform) : []),
+
     scale(1, -1), // make top left
-  );
+  ];
 
   if (options.clipPath) {
-    options.clipPath.forEach((c) => operators.push(c));
-    operators.push(clip(options.clipRule));
-    operators.push(endPath());
+    options.clipPath.forEach((op) => ops.push(op));
+    ops.push(clip(options.clipRule), endPath());
   }
 
-  const ops = graphic(g, page); // can't use spread operator or will hit max call stack
-  ops.forEach((o) => operators.push(o));
+  graphic(g, page).forEach((o) => ops.push(o)); // can't use spread operator or will hit max call stack
 
-  operators.push(popGraphicsState());
+  ops.push(popGraphicsState());
 
-  return operators.filter(Boolean) as PDFOperator[];
+  return ops.filter(Boolean) as PDFOperator[];
 };
 
 export const drawCheckMark = (options: {
@@ -501,11 +1084,11 @@ export const drawCheckBox = (options: {
   filled: boolean;
 }) => {
   const outline = drawRect({
-    x: options.x,
-    y: options.y,
-    width: options.width,
-    height: options.height,
-    strokeWidth: options.borderWidth,
+    x: asNumber(options.x),
+    y: asNumber(options.y),
+    width: asNumber(options.width),
+    height: asNumber(options.height),
+    strokeWidth: asNumber(options.borderWidth),
     fill: options.color,
     stroke: options.borderColor,
   });
@@ -545,20 +1128,20 @@ export const drawRadioButton = (options: {
   const outlineScale = Math.min(width, height) / 2;
 
   const outline = drawEllipse({
-    cx: options.x,
-    cy: options.y,
+    cx: asNumber(options.x),
+    cy: asNumber(options.y),
     rx: outlineScale,
     ry: outlineScale,
     fill: options.color,
     stroke: options.borderColor,
-    strokeWidth: options.borderWidth,
+    strokeWidth: asNumber(options.borderWidth),
   });
 
   if (!options.filled) return outline;
 
   const dot = drawEllipse({
-    cx: options.x,
-    cy: options.y,
+    cx: asNumber(options.x),
+    cy: asNumber(options.y),
     rx: outlineScale * 0.45,
     ry: outlineScale * 0.45,
     fill: options.dotColor,
@@ -582,17 +1165,12 @@ export const drawButton = (options: {
   font: string | PDFName;
   fontSize: number | PDFNumber;
 }) => {
-  const x = asNumber(options.x);
-  const y = asNumber(options.y);
-  const width = asNumber(options.width);
-  const height = asNumber(options.height);
-
   const background = drawRect({
-    x,
-    y,
-    width,
-    height,
-    strokeWidth: options.borderWidth,
+    x: asNumber(options.x),
+    y: asNumber(options.y),
+    width: asNumber(options.width),
+    height: asNumber(options.height),
+    strokeWidth: asNumber(options.borderWidth),
     fill: options.color,
     stroke: options.borderColor,
   });
@@ -688,7 +1266,7 @@ export const drawTextField = (options: {
     y,
     width,
     height,
-    strokeWidth: options.borderWidth,
+    strokeWidth: asNumber(options.borderWidth),
     fill: options.color,
     stroke: options.borderColor,
   });
@@ -764,7 +1342,7 @@ export const drawOptionList = (options: {
     y,
     width,
     height,
-    strokeWidth: options.borderWidth,
+    strokeWidth: asNumber(options.borderWidth),
     fill: options.color,
     stroke: options.borderColor,
   });
@@ -823,12 +1401,12 @@ export const graphic = (
 
   // maybe apply transforms to graphic state
   if (g.transform) {
-    g.transform.forEach((t) => ops.push(t));
+    g.transform.forEach((op) => ops.push(op));
   }
 
   // maybe apply clipping to graphic state
   if (g.clipPath) {
-    g.clipPath.operators.forEach((o) => ops.push(o));
+    g.clipPath.operators.forEach((op) => ops.push(op));
     ops.push(clip(g.clipRule));
     ops.push(endPath());
   }
@@ -839,7 +1417,7 @@ export const graphic = (
       // for each child recursively call graphic and push resultant operators
       g.children.forEach((child) => {
         const operators = graphic(child, page);
-        operators.forEach((o) => ops.push(o)); // can't use spread operator or will hit max call stack
+        operators.forEach((op) => ops.push(op)); // can't use spread operator or will hit max call stack
       });
       break;
 
@@ -871,7 +1449,7 @@ export const graphic = (
       );
 
       // apply operators, i.e. moveTo, lineTo
-      g.operators.forEach((o) => ops.push(o));
+      g.operators.forEach((op) => ops.push(op));
 
       // apply fill and stroke, or separately
       ops.push(
@@ -898,21 +1476,28 @@ export const graphic = (
         ops.push(setGraphicsState(GState));
       }
 
-      console.log(g);
-
-      //   ops.push(scale(1, -1)); // make top left)
-
       g.segments.forEach((segment) => {
         if (typeof segment === 'string') {
+          //   console.log(segment);
           const text = g.font.encodeText(segment);
-
           const font = page.node.newFontDictionary(g.font.name, g.font.ref);
 
           ops.push(
             beginText(),
+            scale(1, -1), // y-flip (negative) corrects coordinate space back to pdf
             g.fill ? setFillingColor(g.fill as Color) : undefined,
-            setFontAndSize(font, g.fontSize),
+            g.stroke ? setStrokingColor(g.stroke as Color) : undefined,
+            g.strokeWidth ? setLineWidth(g.strokeWidth) : undefined,
+            g.strokeLineJoin ? setLineJoin(g.strokeLineJoin) : undefined,
+            g.strokeMiterLimit
+              ? setLineMiterLimit(g.strokeMiterLimit)
+              : undefined,
+            g.strokeLineCap ? setLineCap(g.strokeLineCap) : undefined,
+            g.strokeDashArray || g.strokeDashOffset
+              ? setDashPattern(g.strokeDashArray ?? [], g.strokeDashOffset ?? 0)
+              : undefined,
             g.lineHeight ? setLineHeight(g.lineHeight) : undefined,
+            setFontAndSize(font, g.fontSize),
             // rotateAndSkewTextRadiansAndTranslate(
             //   toRadians(options.rotate),
             //   toRadians(options.xSkew),
@@ -920,12 +1505,12 @@ export const graphic = (
             //   options.x,
             //   options.y,
             // ),
+            showText(text),
+            endText(),
           );
-
-          ops.push(showText(text), endText());
         } else {
           const operators = graphic(segment, page);
-          operators.forEach((o) => ops.push(o));
+          operators.forEach((op) => ops.push(op));
         }
       });
 
@@ -945,10 +1530,12 @@ export const graphic = (
         ops.push(setGraphicsState(GState));
       }
 
-      const name = page.node.newXObject('Image', g.image.ref);
-      ops.push(translate(0, g.height)); // shift by height corrects flip
-      ops.push(scale(g.width, -g.height)); // negative (flip) corrects upside down drawing
-      ops.push(drawObject(name));
+      const image = page.node.newXObject('Image', g.image.ref);
+      ops.push(
+        translate(0, g.height), // shift by height corrects flip
+        scale(g.width, -g.height), // y-flip by height (negative) corrects coordinate space back to pdf
+        drawObject(image),
+      );
       break;
   }
 

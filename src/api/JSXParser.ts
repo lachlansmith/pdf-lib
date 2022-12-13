@@ -2,9 +2,11 @@ import { Children } from 'react';
 import CssParser from 'clean-css';
 import fontkit from '@pdf-lib/fontkit';
 
+import JSXParserState from 'src/api/JSXParserState';
+
 import PDFFont from 'src/api/PDFFont';
 import { LineCapStyle, LineJoinStyle } from 'src/api/operators';
-import { PDFImage, BlendMode } from 'src/api';
+import { PDFImage, BlendMode, Rotation } from 'src/api';
 import PDFDocument from './PDFDocument';
 import { Color, ColorTypes, RGB } from 'src/api/colors';
 import {
@@ -36,8 +38,6 @@ import {
   color,
   opacity,
   camel,
-  first,
-  exists,
 } from 'src/utils';
 
 export const HTMLMinifierOptions = {
@@ -87,10 +87,26 @@ export interface Text extends Base {
   font: PDFFont;
   fontSize: number;
   segments: (string | Text)[];
+  x?: number;
+  y?: number;
+  dx?: number;
+  dy?: number;
+  rotate?: Rotation;
+  lengthAdjust?: 'spacing' | 'spacingAndGlyphs';
+  textLength?: number;
+  textAnchor?: 'start' | 'middle' | 'end';
   lineHeight?: number;
   fill?: Color | LinearGradient | RadialGradient;
+  fillRule?: 'nonzero' | 'evenodd';
   fillOpacity?: number;
   strokeOpacity?: number;
+  stroke?: Color | LinearGradient | RadialGradient;
+  strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
+  strokeDashArray?: number[];
+  strokeDashOffset?: number;
+  strokeLineCap?: LineCapStyle;
 }
 
 export interface Image extends Base {
@@ -171,209 +187,12 @@ export interface RadialGradient {
   stops: Stop[];
 }
 
-export interface Stop {}
-
-export interface Effect {}
-
-export interface Css {
-  [className: string]: any;
+export interface Stop {
+  // TODO: figure this out
 }
 
-export interface Defs {
-  [url: string]: Mask | Filter | ClipPath | LinearGradient | RadialGradient;
-}
-
-export interface Fonts {
-  [family: string]: { [weight: string]: { [style: string]: PDFFont } };
-}
-
-export interface Attributes {
-  fontFamily: string;
-  fontWeight: string;
-  fontStyle: string;
-  fontSize: number;
-  font: PDFFont;
-  fill?: Color;
-}
-
-export class JSXParserState {
-  css: Css;
-  defs: Defs;
-  fonts: Fonts;
-  attributes: Attributes;
-
-  throwOnInvalidElement: boolean;
-
-  tagName?: keyof JSXParsers;
-
-  constructor(
-    css: Css,
-    defs: Defs,
-    fonts: Fonts,
-    attributes: Attributes,
-    options: {
-      throwOnInvalidElement?: boolean;
-    } = {},
-  ) {
-    this.css = css;
-    this.defs = defs;
-    this.fonts = fonts;
-    this.attributes = attributes;
-
-    const { throwOnInvalidElement = true } = options;
-
-    this.throwOnInvalidElement = throwOnInvalidElement;
-  }
-
-  font = (
-    fontFamily: string | undefined,
-    fontWeight: string | undefined,
-    fontStyle: string | undefined,
-    fontSize: number | undefined,
-  ) => {
-    if (fontFamily && this.attributes.fontFamily !== fontFamily) {
-      // if font family and different family
-      this.attributes.fontFamily = fontFamily;
-
-      if (fontWeight) {
-        // new family, use provided weight
-        this.attributes.fontWeight = fontWeight;
-
-        if (fontStyle) {
-          // new family and weight, use provided style
-          this.attributes.fontStyle;
-        } else {
-          // new family and weight, unknown style
-
-          if (!exists(this.fonts, this.attributes.fontFamily)) {
-            // check family exists
-            throw new JSXParserInvalidAttributeError(this, Invalid.fontFamily);
-          }
-
-          if (
-            !exists(
-              this.fonts[this.attributes.fontFamily],
-              this.attributes.fontWeight,
-            )
-          ) {
-            // check weight exists on family
-            throw new JSXParserInvalidAttributeError(this, Invalid.fontWeight);
-          }
-
-          this.attributes.fontStyle = first(
-            // choose first in provided weight
-            this.fonts[this.attributes.fontFamily][this.attributes.fontWeight],
-          );
-        }
-      } else {
-        // new family, unknown weight
-
-        if (!exists(this.fonts, this.attributes.fontFamily)) {
-          // check family exists
-          throw new JSXParserInvalidAttributeError(this, Invalid.fontFamily);
-        }
-
-        this.attributes.fontWeight = first(
-          // choose first in family
-          this.fonts[this.attributes.fontFamily],
-        );
-
-        if (fontStyle) {
-          // new family and choosen weight, use provided style
-          this.attributes.fontStyle;
-        } else {
-          // new family and choosen weight, unknown style
-
-          if (
-            !exists(
-              this.fonts[this.attributes.fontFamily],
-              this.attributes.fontWeight,
-            )
-          ) {
-            // check weight exists on family
-            throw new JSXParserInvalidAttributeError(this, Invalid.fontWeight);
-          }
-
-          this.attributes.fontStyle = first(
-            // choose first in choosen weight
-            this.fonts[this.attributes.fontFamily][this.attributes.fontWeight],
-          );
-        }
-      }
-    } else {
-      // if not font family or same family, use current family
-      if (fontWeight && this.attributes.fontWeight !== fontWeight) {
-        // if font weight and different weight, use that weight
-        this.attributes.fontWeight = fontWeight;
-
-        if (fontStyle && this.attributes.fontStyle !== fontStyle) {
-          // if font style and different style, use that style
-          this.attributes.fontStyle = fontStyle;
-        }
-      }
-    }
-
-    if (!exists(this.fonts, this.attributes.fontFamily)) {
-      // check family exists
-      throw new JSXParserInvalidAttributeError(this, Invalid.fontFamily);
-    }
-
-    if (
-      !exists(
-        this.fonts[this.attributes.fontFamily],
-        this.attributes.fontWeight,
-      )
-    ) {
-      // check weight exists on family
-      throw new JSXParserInvalidAttributeError(this, Invalid.fontWeight);
-    }
-
-    if (
-      !exists(
-        this.fonts[this.attributes.fontFamily][this.attributes.fontWeight],
-        this.attributes.fontStyle,
-      )
-    ) {
-      // check style exists on selected families selected weight
-      throw new JSXParserInvalidAttributeError(this, Invalid.fontStyle);
-    }
-
-    if (
-      this.attributes.font.ref.tag !==
-      this.fonts[this.attributes.fontFamily][this.attributes.fontWeight][
-        this.attributes.fontStyle
-      ].ref.tag
-    ) {
-      // current font is different to selected font, use selected font
-      this.attributes.font = this.fonts[this.attributes.fontFamily][
-        this.attributes.fontWeight
-      ][this.attributes.fontStyle];
-    }
-
-    if (fontSize && this.attributes.fontSize !== fontSize) {
-      // current font size is different to selected font size, use selected font size
-      this.attributes.fontSize = fontSize;
-    }
-  };
-
-  fill = (fill?: string) => {
-    if (fill) {
-      // current fill is different to selected fill, use selected fill
-      this.attributes.fill = color(this, fill) as Color;
-    }
-  };
-
-  copy = () => {
-    return new JSXParserState(
-      this.css,
-      this.defs,
-      this.fonts,
-      this.attributes,
-      {
-        throwOnInvalidElement: this.throwOnInvalidElement,
-      },
-    );
-  };
+export interface Effect {
+  // TODO: figure this out
 }
 
 const children = async <T>(
@@ -401,11 +220,11 @@ const children = async <T>(
   return kiddles.filter(Boolean) as Exclude<T, undefined>[];
 };
 
-type JSXParsers = typeof parsers;
+export type JSXParsers = typeof parsers;
 
 export const parsers = {
   a(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -457,9 +276,8 @@ export const parsers = {
     const clipPath: ClipPath = {
       type: 'clipPath',
       clipPathUnits: props.clipPathUnits,
-      operators: shape({
-        type: 'group',
-        children: await children(props.children, async (child) => {
+      operators: shape(
+        await children(props.children, async (child) => {
           if (typeof child === 'string') {
             return;
           }
@@ -470,9 +288,9 @@ export const parsers = {
             tagName !== 'ellipse' &&
             tagName !== 'path' &&
             tagName !== 'polygon' &&
-            tagName !== 'rect' &&
-            // tagName !== 'text' && // needs opentype.js conversion to Shape
-            tagName !== 'use'
+            tagName !== 'rect'
+            // tagName !== 'text' && // needs fontkit conversion to Shape
+            // tagName !== 'use'
           ) {
             throw new JSXParserInvalidElementError(
               state,
@@ -482,9 +300,10 @@ export const parsers = {
 
           state.tagName = tagName;
 
-          return await parsers[tagName](child.props, doc, state.copy());
+          const shape = await parsers[tagName](child.props, doc, state.copy());
+          return shape.operators;
         }),
-      }),
+      ),
     };
 
     state.defs[url] = definedKeysOf(clipPath);
@@ -505,7 +324,7 @@ export const parsers = {
   },
 
   desc(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -554,7 +373,7 @@ export const parsers = {
   },
 
   feBlend(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -565,7 +384,7 @@ export const parsers = {
   },
 
   feColorMatrix(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -576,7 +395,7 @@ export const parsers = {
   },
 
   feComponentTransfer(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -587,7 +406,7 @@ export const parsers = {
   },
 
   feComposite(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -598,7 +417,7 @@ export const parsers = {
   },
 
   feConvolveMatrix(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -609,7 +428,7 @@ export const parsers = {
   },
 
   feDiffuseLighting(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -620,7 +439,7 @@ export const parsers = {
   },
 
   feDisplacementMap(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -631,7 +450,7 @@ export const parsers = {
   },
 
   feDistantLight(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -642,7 +461,7 @@ export const parsers = {
   },
 
   feDropShadow(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -653,7 +472,7 @@ export const parsers = {
   },
 
   feFlood(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -664,7 +483,7 @@ export const parsers = {
   },
 
   feFuncA(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -675,7 +494,7 @@ export const parsers = {
   },
 
   feFuncB(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -686,7 +505,7 @@ export const parsers = {
   },
 
   feFuncG(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -697,7 +516,7 @@ export const parsers = {
   },
 
   feFuncR(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -708,7 +527,7 @@ export const parsers = {
   },
 
   feGaussianBlur(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -719,7 +538,7 @@ export const parsers = {
   },
 
   feImage(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -730,7 +549,7 @@ export const parsers = {
   },
 
   feMerge(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -741,7 +560,7 @@ export const parsers = {
   },
 
   feMergeNode(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -752,7 +571,7 @@ export const parsers = {
   },
 
   feMorphology(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -763,7 +582,7 @@ export const parsers = {
   },
 
   feOffset(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -774,7 +593,7 @@ export const parsers = {
   },
 
   fePointLight(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -785,7 +604,7 @@ export const parsers = {
   },
 
   feSpecularLighting(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -796,7 +615,7 @@ export const parsers = {
   },
 
   feSpotLight(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -807,7 +626,7 @@ export const parsers = {
   },
 
   feTile(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -818,7 +637,7 @@ export const parsers = {
   },
 
   feTurbulence(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -830,7 +649,7 @@ export const parsers = {
 
   async filter(props: any, doc: PDFDocument, state: JSXParserState) {
     // this is here until implementation verified
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -921,7 +740,7 @@ export const parsers = {
           return;
         }
 
-        return await parseJsx(child, doc, state);
+        return await parseJsx(child, doc, state.copy());
       }),
     };
 
@@ -1054,7 +873,7 @@ export const parsers = {
 
   async linearGradient(props: any, doc: PDFDocument, state: JSXParserState) {
     // this is here until implementation verified
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -1096,7 +915,7 @@ export const parsers = {
   },
 
   marker(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -1106,9 +925,9 @@ export const parsers = {
     return undefined;
   },
 
-  async mask(props: any, _: PDFDocument, state: JSXParserState) {
+  async mask(props: any, doc: PDFDocument, state: JSXParserState) {
     // this is here until implementation verified
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -1124,7 +943,32 @@ export const parsers = {
       height: parseFloat(props.height),
       maskContentUnits: props.maskContentUnits,
       maskUnits: props.maskUnits,
-      operators: [],
+      operators: shape(
+        await children(props.children, async (child) => {
+          if (typeof child === 'string') {
+            return;
+          }
+
+          const tagName = child.type.toString() as keyof JSXParsers;
+          if (
+            tagName !== 'circle' &&
+            tagName !== 'ellipse' &&
+            tagName !== 'path' &&
+            tagName !== 'polygon' &&
+            tagName !== 'rect'
+            // tagName !== 'text' && // needs fontkit conversion to Shape
+            // tagName !== 'use'
+          ) {
+            throw new JSXParserInvalidElementError(
+              state,
+              'Invalid child, ' + tagName,
+            );
+          }
+
+          const shape = await parsers[tagName](child.props, doc, state.copy());
+          return shape.operators;
+        }),
+      ),
     };
 
     state.defs[url] = definedKeysOf(mask);
@@ -1133,7 +977,7 @@ export const parsers = {
   },
 
   metadata(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -1177,7 +1021,7 @@ export const parsers = {
   },
 
   pattern(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -1247,7 +1091,7 @@ export const parsers = {
 
   async radialGradient(props: any, doc: PDFDocument, state: JSXParserState) {
     // this is here until implementation verified
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -1331,7 +1175,7 @@ export const parsers = {
   },
 
   stop(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -1342,7 +1186,6 @@ export const parsers = {
   },
 
   async style(props: any, doc: PDFDocument, state: JSXParserState) {
-    // TODO: make this quicker as large amount of internal CSS is slow
     // TODO: add tag name support
 
     const css = new CssParser({
@@ -1357,7 +1200,6 @@ export const parsers = {
     while ((cls = regex.exec(css.styles))) {
       if (cls[1] === '@font-face') {
         let family, weight, style, src;
-        doc.registerFontkit(fontkit);
         const reg = /(.*?):(?:url\('(data:(.*?);base64,.*?)'\) format\(.*?\)|(.*?));/g;
         let match;
         while ((match = reg.exec(cls[3]))) {
@@ -1400,24 +1242,19 @@ export const parsers = {
           style = 'normal';
         }
 
+        doc.registerFontkit(fontkit);
         if (state.fonts[family]) {
           if (state.fonts[family][weight]) {
-            state.fonts[family][weight][style] = await doc.embedFont(src, {
-              customName: family,
-            });
+            state.fonts[family][weight][style] = await doc.embedFont(src);
           } else {
             state.fonts[family][weight] = {
-              [style]: await doc.embedFont(src, {
-                customName: family,
-              }),
+              [style]: await doc.embedFont(src),
             };
           }
         } else {
           state.fonts[family] = {
             [weight]: {
-              [style]: await doc.embedFont(src, {
-                customName: `${family}-${weight}`,
-              }),
+              [style]: await doc.embedFont(src),
             },
           };
         }
@@ -1458,7 +1295,7 @@ export const parsers = {
           return;
         }
 
-        return await parseJsx(child, doc, state);
+        return await parseJsx(child, doc, state.copy());
       }),
     };
 
@@ -1466,7 +1303,7 @@ export const parsers = {
   },
 
   symbol(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -1479,19 +1316,16 @@ export const parsers = {
   async text(props: any, doc: PDFDocument, state: JSXParserState) {
     const a = attributes(props, state.css, props.style);
 
-    // if (!state.attributes.font) {
-    //   throw new Error();
-    // }
+    state.update(a);
 
-    state.font(a.fontFamily, a.fontWeight, a.fontStyle, parseInt(a.fontSize));
-    state.fill(a.fill);
+    if (!state.attributes.font && state.options.throwOnInvalidAttribute) {
+      throw new JSXParserInvalidAttributeError(state, Invalid.font);
+    }
 
     const text: Text = {
       type: 'text',
-      fill: state.attributes.fill,
-      fontSize: state.attributes.fontSize,
       font: state.attributes.font,
-      transform: transform(props.transform),
+      fontSize: state.attributes.fontSize,
       segments: await children(props.children, async (child) => {
         if (typeof child === 'string') {
           return child;
@@ -1509,13 +1343,30 @@ export const parsers = {
 
         return await parsers[tagName](child.props, doc, state.copy());
       }),
+      mask: mask(state, a.mask),
+      filter: filter(state, a.filter),
+      clipPath: clipPath(state, a.clipPath),
+      clipRule: a.clipRule,
+      fill: state.attributes.fill,
+      fillRule: a.fillRule,
+      fillOpacity: opacity(a.fillOpacity, a.opacity),
+      stroke: color(state, a.stroke),
+      strokeWidth: a.strokeWidth,
+      strokeLineJoin: a.strokeLineJoin,
+      strokeMiterLimit: parseFloat(a.strokeMiterLimit),
+      strokeLineCap: a.strokeLineCap,
+      strokeDashArray: a.strokeDashArray,
+      strokeDashOffset: parseFloat(a.strokeDashOffset),
+      strokeOpacity: opacity(a.strokeOpacity, a.opacity),
+      mixBlendMode: mixBlendMode(a.mixBlendMode),
+      transform: transform(props.transform),
     };
 
     return definedKeysOf(text);
   },
 
   async textPath(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -1526,7 +1377,7 @@ export const parsers = {
   },
 
   title(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',
@@ -1539,14 +1390,16 @@ export const parsers = {
   async tspan(props: any, doc: PDFDocument, state: JSXParserState) {
     const a = attributes(props, state.css, props.style);
 
-    state.font(a.fontFamily, a.fontWeight, a.fontStyle, parseInt(a.fontSize));
-    state.fill(a.fill);
+    state.update(a);
+
+    if (!state.attributes.font) {
+      throw new JSXParserInvalidAttributeError(state, Invalid.font);
+    }
 
     const text: Text = {
       type: 'text',
-      fill: state.attributes.fill,
-      fontSize: state.attributes.fontSize,
       font: state.attributes.font,
+      fontSize: state.attributes.fontSize,
       segments: await children(props.children, async (child) => {
         if (typeof child === 'string') {
           return child;
@@ -1564,13 +1417,30 @@ export const parsers = {
 
         return await parsers[tagName](child.props, doc, state.copy());
       }),
+      mask: mask(state, a.mask),
+      filter: filter(state, a.filter),
+      clipPath: clipPath(state, a.clipPath),
+      clipRule: a.clipRule,
+      fill: state.attributes.fill,
+      fillRule: a.fillRule,
+      fillOpacity: opacity(a.fillOpacity, a.opacity),
+      stroke: color(state, a.stroke),
+      strokeWidth: a.strokeWidth,
+      strokeLineJoin: a.strokeLineJoin,
+      strokeMiterLimit: parseFloat(a.strokeMiterLimit),
+      strokeLineCap: a.strokeLineCap,
+      strokeDashArray: a.strokeDashArray,
+      strokeDashOffset: parseFloat(a.strokeDashOffset),
+      strokeOpacity: opacity(a.strokeOpacity, a.opacity),
+      mixBlendMode: mixBlendMode(a.mixBlendMode),
+      transform: transform(props.transform),
     };
 
     return definedKeysOf(text);
   },
 
   async use(_: any, __: PDFDocument, state: JSXParserState) {
-    if (state.throwOnInvalidElement) {
+    if (state.options.throwOnInvalidElement) {
       throw new JSXParserInvalidElementError(
         state,
         'Parser for element not supported',

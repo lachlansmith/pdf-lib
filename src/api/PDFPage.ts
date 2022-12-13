@@ -8,11 +8,16 @@ import {
   drawPath,
   drawEllipse,
   draw,
+  drawArc,
+  drawCircle,
+  drawPolygon,
+  drawPolyline,
 } from 'src/api/operations';
 import {
   popGraphicsState,
   pushGraphicsState,
   LineCapStyle,
+  LineJoinStyle,
 } from 'src/api/operators';
 import { translate, scale } from 'src/api/transform';
 import PDFDocument from 'src/api/PDFDocument';
@@ -21,6 +26,7 @@ import PDFFont from 'src/api/PDFFont';
 import PDFImage from 'src/api/PDFImage';
 import { Text, Group, Image, Shape } from 'src/api/JSXParser';
 import {
+  PDFPageDrawArcOptions,
   PDFPageDrawCircleOptions,
   PDFPageDrawEllipseOptions,
   PDFPageDrawImageOptions,
@@ -28,6 +34,8 @@ import {
   PDFPageDrawPageOptions,
   PDFPageDrawRectOptions,
   PDFPageDrawPathOptions,
+  PDFPageDrawPolylineOptions,
+  PDFPageDrawPolygonOptions,
   PDFPageDrawTextOptions,
   PDFPageDrawOptions,
   BlendMode,
@@ -55,6 +63,7 @@ import {
   lineSplit,
   assertRangeOrUndefined,
   assertIsOneOfOrUndefined,
+  opacity,
 } from 'src/utils';
 
 /**
@@ -996,7 +1005,7 @@ export default class PDFPage {
 
     const graphicsStateKey = this.maybeEmbedGraphicsState({
       opacity: options.opacity,
-      blendMode: options.blendMode,
+      mixBlendMode: options.blendMode,
     });
 
     const contentStream = this.getContentStream();
@@ -1063,7 +1072,7 @@ export default class PDFPage {
 
     const graphicsStateKey = this.maybeEmbedGraphicsState({
       opacity: options.opacity,
-      blendMode: options.blendMode,
+      mixBlendMode: options.blendMode,
     });
 
     const contentStream = this.getContentStream();
@@ -1140,7 +1149,7 @@ export default class PDFPage {
 
     const graphicsStateKey = this.maybeEmbedGraphicsState({
       opacity: options.opacity,
-      blendMode: options.blendMode,
+      mixBlendMode: options.blendMode,
     });
 
     // prettier-ignore
@@ -1170,6 +1179,610 @@ export default class PDFPage {
         graphicsState: graphicsStateKey,
       }),
     );
+  }
+
+  /**
+   * Draw a line on this page. For example:
+   * ```js
+   * import { rgb } from 'pdf-lib'
+   *
+   * page.drawLine({
+   *   start: { x: 25, y: 75 },
+   *   end: { x: 125, y: 175 },
+   *   thickness: 2,
+   *   color: rgb(0.75, 0.2, 0.2),
+   *   opacity: 0.75,
+   * })
+   * ```
+   * @param options The options to be used when drawing the line.
+   */
+  drawLine(options: PDFPageDrawLineOptions): void {
+    assertIs(options.x1, 'options.x1', ['number']);
+    assertIs(options.y1, 'options.x1', ['number']);
+    assertIs(options.x2, 'options.x1', ['number']);
+    assertIs(options.y2, 'options.x1', ['number']);
+    assertOrUndefined(options.rotate, 'options.rotate', [
+      [Object, 'Rotation'],
+      Array,
+    ]);
+    assertOrUndefined(options.scale, 'options.scale', ['number', Array]);
+    assertOrUndefined(options.translate, 'options.translate', [
+      'number',
+      Array,
+    ]);
+    assertOrUndefined(options.skew, 'options.skew', ['number', Array]);
+    assertOrUndefined(options.matrix, 'options.matrix', [Array]);
+    assertOrUndefined(options.transform, 'options.transform', ['string']);
+    assertOrUndefined(options.clipPath, 'options.clipPath', [Array]);
+    assertIsOneOfOrUndefined(options.clipRule, 'options.clipRule', [
+      'nonzero',
+      'evenodd',
+    ]);
+    assertOrUndefined(options.stroke, 'options.stroke', [[Object, 'Color']]);
+    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
+    assertIsOneOfOrUndefined(
+      options.strokeLineJoin,
+      'options.strokeLineJoin',
+      LineJoinStyle,
+    );
+    assertOrUndefined(options.strokeMiterLimit, 'options.strokeWidth', [
+      'number',
+    ]);
+    assertOrUndefined(options.strokeDashArray, 'options.strokeDashArray', [
+      Array,
+    ]);
+    assertOrUndefined(options.strokeDashOffset, 'options.strokeDashPhase', [
+      'number',
+    ]);
+    assertIsOneOfOrUndefined(
+      options.strokeLineCap,
+      'options.strokeLineCap',
+      LineCapStyle,
+    );
+    assertRangeOrUndefined(
+      options.strokeOpacity,
+      'options.strokeOpacity',
+      0,
+      1,
+    );
+    assertRangeOrUndefined(options.opacity, 'options.opacity', 0, 1);
+    assertIsOneOfOrUndefined(
+      options.mixBlendMode,
+      'options.mixBlendMode',
+      BlendMode,
+    );
+
+    const graphicsStateKey = this.maybeEmbedGraphicsState({
+      strokeOpacity: options.strokeOpacity,
+      opacity: options.opacity,
+      mixBlendMode: options.mixBlendMode,
+    });
+
+    if (!('stroke' in options)) {
+      options.stroke = rgb(0, 0, 0);
+    }
+
+    const contentStream = this.getContentStream();
+    drawLine({
+      x1: options.x1 ?? 0,
+      y1: options.y1 ?? 0,
+      x2: options.x2 ?? 1,
+      y2: options.y2 ?? 1,
+      rotate: options.rotate ?? undefined,
+      scale: options.scale ?? undefined,
+      translate: options.translate ?? undefined,
+      skew: options.skew ?? undefined,
+      matrix: options.matrix ?? undefined,
+      transform: options.transform ?? undefined,
+      clipPath: options.clipPath ?? undefined,
+      clipRule: options.clipRule ?? 'nonzero',
+      stroke: options.stroke ?? undefined,
+      strokeWidth: options.strokeWidth ?? undefined,
+      strokeLineJoin: options.strokeLineJoin ?? undefined,
+      strokeMiterLimit: options.strokeMiterLimit ?? undefined,
+      strokeDashArray: options.strokeDashArray ?? undefined,
+      strokeDashOffset: options.strokeDashOffset ?? undefined,
+      strokeLineCap: options.strokeLineCap ?? undefined,
+      graphicsState: graphicsStateKey,
+    }).forEach((op) => contentStream.push(op));
+  }
+
+  /**
+   * Draw a rectangle on this page. For example:
+   * ```js
+   * import { degrees, grayscale, rgb } from 'pdf-lib'
+   *
+   * page.drawRectangle({
+   *   x: 25,
+   *   y: 75,
+   *   width: 250,
+   *   height: 75,
+   *   rotate: degrees(-15),
+   *   borderWidth: 5,
+   *   borderColor: grayscale(0.5),
+   *   color: rgb(0.75, 0.2, 0.2),
+   *   opacity: 0.5,
+   *   borderOpacity: 0.75,
+   * })
+   * ```
+   * @param options The options to be used when drawing the rectangle.
+   */
+  drawRect(options: PDFPageDrawRectOptions = {}): void {
+    assertOrUndefined(options.x, 'options.x', ['number']);
+    assertOrUndefined(options.y, 'options.y', ['number']);
+    assertOrUndefined(options.width, 'options.width', ['number']);
+    assertOrUndefined(options.height, 'options.height', ['number']);
+    assertOrUndefined(options.rx, 'options.rx', ['number']);
+    assertOrUndefined(options.ry, 'options.ry', ['number']);
+    assertOrUndefined(options.rotate, 'options.rotate', [
+      [Object, 'Rotation'],
+      Array,
+    ]);
+    assertOrUndefined(options.scale, 'options.scale', ['number', Array]);
+    assertOrUndefined(options.translate, 'options.translate', [
+      'number',
+      Array,
+    ]);
+    assertOrUndefined(options.skew, 'options.skew', ['number', Array]);
+    assertOrUndefined(options.matrix, 'options.matrix', [Array]);
+    assertOrUndefined(options.transform, 'options.transform', ['string']);
+    assertOrUndefined(options.clipPath, 'options.clipPath', [Array]);
+    assertIsOneOfOrUndefined(options.clipRule, 'options.clipRule', [
+      'nonzero',
+      'evenodd',
+    ]);
+    assertOrUndefined(options.fill, 'options.fill', ['number']);
+    assertIsOneOfOrUndefined(options.fillRule, 'options.fillRule', [
+      'nonzero',
+      'evenodd',
+    ]);
+    assertOrUndefined(options.stroke, 'options.stroke', [[Object, 'Color']]);
+    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
+    assertIsOneOfOrUndefined(
+      options.strokeLineJoin,
+      'options.strokeLineJoin',
+      LineJoinStyle,
+    );
+    assertOrUndefined(options.strokeMiterLimit, 'options.strokeWidth', [
+      'number',
+    ]);
+    assertOrUndefined(options.strokeDashArray, 'options.strokeDashArray', [
+      Array,
+    ]);
+    assertOrUndefined(options.strokeDashOffset, 'options.strokeDashPhase', [
+      'number',
+    ]);
+    assertIsOneOfOrUndefined(
+      options.strokeLineCap,
+      'options.strokeLineCap',
+      LineCapStyle,
+    );
+    assertRangeOrUndefined(
+      options.strokeOpacity,
+      'options.strokeOpacity',
+      0,
+      1,
+    );
+    assertRangeOrUndefined(options.opacity, 'options.opacity', 0, 1);
+    assertIsOneOfOrUndefined(
+      options.mixBlendMode,
+      'options.mixBlendMode',
+      BlendMode,
+    );
+
+    const graphicsStateKey = this.maybeEmbedGraphicsState({
+      fillOpacity: options.fillOpacity,
+      strokeOpacity: options.strokeOpacity,
+      opacity: options.opacity,
+      mixBlendMode: options.mixBlendMode,
+    });
+
+    if (!('fill' in options) && !('stroke' in options)) {
+      options.fill = rgb(0, 0, 0);
+    }
+
+    const contentStream = this.getContentStream();
+    drawRect({
+      x: options.x ?? this.x,
+      y: options.y ?? this.y,
+      width: options.width ?? 150,
+      height: options.height ?? 100,
+      rx: options.rx ?? undefined,
+      ry: options.ry ?? undefined,
+      rotate: options.rotate ?? undefined,
+      scale: options.scale ?? undefined,
+      translate: options.translate ?? undefined,
+      skew: options.skew ?? undefined,
+      matrix: options.matrix ?? undefined,
+      transform: options.transform ?? undefined,
+      clipPath: options.clipPath ?? undefined,
+      clipRule: options.clipRule ?? 'nonzero',
+      fill: options.fill ?? undefined,
+      fillRule: options.fillRule ?? 'nonzero',
+      stroke: options.stroke ?? undefined,
+      strokeWidth: options.strokeWidth ?? undefined,
+      strokeLineJoin: options.strokeLineJoin ?? undefined,
+      strokeMiterLimit: options.strokeMiterLimit ?? undefined,
+      strokeDashArray: options.strokeDashArray ?? undefined,
+      strokeDashOffset: options.strokeDashOffset ?? undefined,
+      strokeLineCap: options.strokeLineCap ?? undefined,
+      graphicsState: graphicsStateKey,
+    }).forEach((op) => contentStream.push(op));
+  }
+
+  /**
+   * Draw an ellipse on this page. For example:
+   * ```js
+   * import { grayscale, rgb } from 'pdf-lib'
+   *
+   * page.drawEllipse({
+   *   x: 200,
+   *   y: 75,
+   *   xScale: 100,
+   *   yScale: 50,
+   *   borderWidth: 5,
+   *   borderColor: grayscale(0.5),
+   *   color: rgb(0.75, 0.2, 0.2),
+   *   opacity: 0.5,
+   *   borderOpacity: 0.75,
+   * })
+   * ```
+   * @param options The options to be used when drawing the ellipse.
+   */
+  drawArc(options: PDFPageDrawArcOptions = {}): void {
+    assertOrUndefined(options.x, 'options.x', ['number']);
+    assertOrUndefined(options.y, 'options.y', ['number']);
+    assertOrUndefined(options.rx, 'options.rx', ['number']);
+    assertOrUndefined(options.ry, 'options.ry', ['number']);
+    assertOrUndefined(options.rot, 'options.rot', ['number']);
+    assertOrUndefined(options.large, 'options.large', ['number']);
+    assertOrUndefined(options.sweep, 'options.sweep', ['number']);
+    assertOrUndefined(options.ex, 'options.ex', ['number']);
+    assertOrUndefined(options.ey, 'options.ey', ['number']);
+    assertOrUndefined(options.rotate, 'options.rotate', [
+      [Object, 'Rotation'],
+      Array,
+    ]);
+    assertOrUndefined(options.scale, 'options.scale', ['number', Array]);
+    assertOrUndefined(options.translate, 'options.translate', [
+      'number',
+      Array,
+    ]);
+    assertOrUndefined(options.skew, 'options.skew', ['number', Array]);
+    assertOrUndefined(options.matrix, 'options.matrix', [Array]);
+    assertOrUndefined(options.transform, 'options.transform', ['string']);
+    assertOrUndefined(options.clipPath, 'options.clipPath', [Array]);
+    assertIsOneOfOrUndefined(options.clipRule, 'options.clipRule', [
+      'nonzero',
+      'evenodd',
+    ]);
+    assertOrUndefined(options.fill, 'options.fill', ['number']);
+    assertIsOneOfOrUndefined(options.fillRule, 'options.fillRule', [
+      'nonzero',
+      'evenodd',
+    ]);
+    assertOrUndefined(options.stroke, 'options.stroke', [[Object, 'Color']]);
+    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
+    assertIsOneOfOrUndefined(
+      options.strokeLineJoin,
+      'options.strokeLineJoin',
+      LineJoinStyle,
+    );
+    assertOrUndefined(options.strokeMiterLimit, 'options.strokeWidth', [
+      'number',
+    ]);
+    assertOrUndefined(options.strokeDashArray, 'options.strokeDashArray', [
+      Array,
+    ]);
+    assertOrUndefined(options.strokeDashOffset, 'options.strokeDashPhase', [
+      'number',
+    ]);
+    assertIsOneOfOrUndefined(
+      options.strokeLineCap,
+      'options.strokeLineCap',
+      LineCapStyle,
+    );
+    assertRangeOrUndefined(
+      options.strokeOpacity,
+      'options.strokeOpacity',
+      0,
+      1,
+    );
+    assertRangeOrUndefined(options.opacity, 'options.opacity', 0, 1);
+    assertIsOneOfOrUndefined(
+      options.mixBlendMode,
+      'options.mixBlendMode',
+      BlendMode,
+    );
+
+    const graphicsStateKey = this.maybeEmbedGraphicsState({
+      fillOpacity: options.fillOpacity,
+      strokeOpacity: options.strokeOpacity,
+      opacity: options.opacity,
+      mixBlendMode: options.mixBlendMode,
+    });
+
+    if (!('fill' in options) && !('stroke' in options)) {
+      options.fill = rgb(0, 0, 0);
+    }
+
+    const contentStream = this.getContentStream();
+    drawArc({
+      x: options.x ?? this.x,
+      y: options.y ?? this.y,
+      rx: options.rx ?? 100,
+      ry: options.ry ?? 100,
+      rot: options.rot ?? 0,
+      large: options.large ?? 0,
+      sweep: options.sweep ?? 1,
+      ex: options.ex ?? this.x + 100,
+      ey: options.ey ?? this.x + 100,
+      rotate: options.rotate ?? undefined,
+      scale: options.scale ?? undefined,
+      translate: options.translate ?? undefined,
+      skew: options.skew ?? undefined,
+      matrix: options.matrix ?? undefined,
+      transform: options.transform ?? undefined,
+      clipPath: options.clipPath ?? undefined,
+      clipRule: options.clipRule ?? 'nonzero',
+      fill: options.fill ?? undefined,
+      fillRule: options.fillRule ?? 'nonzero',
+      stroke: options.stroke ?? undefined,
+      strokeWidth: options.strokeWidth ?? undefined,
+      strokeLineJoin: options.strokeLineJoin ?? undefined,
+      strokeMiterLimit: options.strokeMiterLimit ?? undefined,
+      strokeDashArray: options.strokeDashArray ?? undefined,
+      strokeDashOffset: options.strokeDashOffset ?? undefined,
+      strokeLineCap: options.strokeLineCap ?? undefined,
+      graphicsState: graphicsStateKey,
+    }).forEach((op) => contentStream.push(op));
+  }
+
+  /**
+   * Draw an ellipse on this page. For example:
+   * ```js
+   * import { grayscale, rgb } from 'pdf-lib'
+   *
+   * page.drawEllipse({
+   *   x: 200,
+   *   y: 75,
+   *   xScale: 100,
+   *   yScale: 50,
+   *   borderWidth: 5,
+   *   borderColor: grayscale(0.5),
+   *   color: rgb(0.75, 0.2, 0.2),
+   *   opacity: 0.5,
+   *   borderOpacity: 0.75,
+   * })
+   * ```
+   * @param options The options to be used when drawing the ellipse.
+   */
+  drawEllipse(options: PDFPageDrawEllipseOptions = {}): void {
+    assertOrUndefined(options.cx, 'options.x', ['number']);
+    assertOrUndefined(options.cy, 'options.y', ['number']);
+    assertOrUndefined(options.rx, 'options.rx', ['number']);
+    assertOrUndefined(options.ry, 'options.ry', ['number']);
+    assertOrUndefined(options.rotate, 'options.rotate', [
+      [Object, 'Rotation'],
+      Array,
+    ]);
+    assertOrUndefined(options.scale, 'options.scale', ['number', Array]);
+    assertOrUndefined(options.translate, 'options.translate', [
+      'number',
+      Array,
+    ]);
+    assertOrUndefined(options.skew, 'options.skew', ['number', Array]);
+    assertOrUndefined(options.matrix, 'options.matrix', [Array]);
+    assertOrUndefined(options.transform, 'options.transform', ['string']);
+    assertOrUndefined(options.clipPath, 'options.clipPath', [Array]);
+    assertIsOneOfOrUndefined(options.clipRule, 'options.clipRule', [
+      'nonzero',
+      'evenodd',
+    ]);
+    assertOrUndefined(options.fill, 'options.fill', ['number']);
+    assertIsOneOfOrUndefined(options.fillRule, 'options.fillRule', [
+      'nonzero',
+      'evenodd',
+    ]);
+    assertOrUndefined(options.stroke, 'options.stroke', [[Object, 'Color']]);
+    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
+    assertIsOneOfOrUndefined(
+      options.strokeLineJoin,
+      'options.strokeLineJoin',
+      LineJoinStyle,
+    );
+    assertOrUndefined(options.strokeMiterLimit, 'options.strokeWidth', [
+      'number',
+    ]);
+    assertOrUndefined(options.strokeDashArray, 'options.strokeDashArray', [
+      Array,
+    ]);
+    assertOrUndefined(options.strokeDashOffset, 'options.strokeDashPhase', [
+      'number',
+    ]);
+    assertIsOneOfOrUndefined(
+      options.strokeLineCap,
+      'options.strokeLineCap',
+      LineCapStyle,
+    );
+    assertRangeOrUndefined(
+      options.strokeOpacity,
+      'options.strokeOpacity',
+      0,
+      1,
+    );
+    assertRangeOrUndefined(options.opacity, 'options.opacity', 0, 1);
+    assertIsOneOfOrUndefined(
+      options.mixBlendMode,
+      'options.mixBlendMode',
+      BlendMode,
+    );
+
+    const graphicsStateKey = this.maybeEmbedGraphicsState({
+      fillOpacity: options.fillOpacity,
+      strokeOpacity: options.strokeOpacity,
+      opacity: options.opacity,
+      mixBlendMode: options.mixBlendMode,
+    });
+
+    if (!('fill' in options) && !('stroke' in options)) {
+      options.fill = rgb(0, 0, 0);
+    }
+
+    const contentStream = this.getContentStream();
+    drawEllipse({
+      cx: options.cx ?? this.x,
+      cy: options.cy ?? this.y,
+      rx: options.rx ?? 100,
+      ry: options.ry ?? 100,
+      rotate: options.rotate ?? undefined,
+      scale: options.scale ?? undefined,
+      translate: options.translate ?? undefined,
+      skew: options.skew ?? undefined,
+      matrix: options.matrix ?? undefined,
+      transform: options.transform ?? undefined,
+      clipPath: options.clipPath ?? undefined,
+      clipRule: options.clipRule ?? 'nonzero',
+      fill: options.fill ?? undefined,
+      fillRule: options.fillRule ?? 'nonzero',
+      stroke: options.stroke ?? undefined,
+      strokeWidth: options.strokeWidth ?? undefined,
+      strokeLineJoin: options.strokeLineJoin ?? undefined,
+      strokeMiterLimit: options.strokeMiterLimit ?? undefined,
+      strokeDashArray: options.strokeDashArray ?? undefined,
+      strokeDashOffset: options.strokeDashOffset ?? undefined,
+      strokeLineCap: options.strokeLineCap ?? undefined,
+      graphicsState: graphicsStateKey,
+    }).forEach((op) => contentStream.push(op));
+  }
+
+  /**
+   * Draw an ellipse on this page. For example:
+   * ```js
+   * import { grayscale, rgb } from 'pdf-lib'
+   *
+   * page.drawEllipse({
+   *   x: 200,
+   *   y: 75,
+   *   xScale: 100,
+   *   yScale: 50,
+   *   borderWidth: 5,
+   *   borderColor: grayscale(0.5),
+   *   color: rgb(0.75, 0.2, 0.2),
+   *   opacity: 0.5,
+   *   borderOpacity: 0.75,
+   * })
+   * ```
+   * @param options The options to be used when drawing the ellipse.
+   */
+  drawCircle(options: PDFPageDrawCircleOptions = {}): void {
+    assertOrUndefined(options.cx, 'options.x', ['number']);
+    assertOrUndefined(options.cy, 'options.y', ['number']);
+    assertOrUndefined(options.r, 'options.r', ['number']);
+    assertOrUndefined(options.rotate, 'options.rotate', [
+      [Object, 'Rotation'],
+      Array,
+    ]);
+    assertOrUndefined(options.scale, 'options.scale', ['number', Array]);
+    assertOrUndefined(options.translate, 'options.translate', [
+      'number',
+      Array,
+    ]);
+    assertOrUndefined(options.skew, 'options.skew', ['number', Array]);
+    assertOrUndefined(options.matrix, 'options.matrix', [Array]);
+    assertOrUndefined(options.transform, 'options.transform', ['string']);
+    assertOrUndefined(options.clipPath, 'options.clipPath', [Array]);
+    assertIsOneOfOrUndefined(options.clipRule, 'options.clipRule', [
+      'nonzero',
+      'evenodd',
+    ]);
+    assertOrUndefined(options.fill, 'options.fill', ['number']);
+    assertIsOneOfOrUndefined(options.fillRule, 'options.fillRule', [
+      'nonzero',
+      'evenodd',
+    ]);
+    assertOrUndefined(options.stroke, 'options.stroke', [[Object, 'Color']]);
+    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
+    assertIsOneOfOrUndefined(
+      options.strokeLineJoin,
+      'options.strokeLineJoin',
+      LineJoinStyle,
+    );
+    assertOrUndefined(options.strokeMiterLimit, 'options.strokeWidth', [
+      'number',
+    ]);
+    assertOrUndefined(options.strokeDashArray, 'options.strokeDashArray', [
+      Array,
+    ]);
+    assertOrUndefined(options.strokeDashOffset, 'options.strokeDashPhase', [
+      'number',
+    ]);
+    assertIsOneOfOrUndefined(
+      options.strokeLineCap,
+      'options.strokeLineCap',
+      LineCapStyle,
+    );
+    assertRangeOrUndefined(
+      options.strokeOpacity,
+      'options.strokeOpacity',
+      0,
+      1,
+    );
+    assertRangeOrUndefined(options.opacity, 'options.opacity', 0, 1);
+    assertIsOneOfOrUndefined(
+      options.mixBlendMode,
+      'options.mixBlendMode',
+      BlendMode,
+    );
+
+    const graphicsStateKey = this.maybeEmbedGraphicsState({
+      fillOpacity: options.fillOpacity,
+      strokeOpacity: options.strokeOpacity,
+      opacity: options.opacity,
+      mixBlendMode: options.mixBlendMode,
+    });
+
+    if (!('fill' in options) && !('stroke' in options)) {
+      options.fill = rgb(0, 0, 0);
+    }
+
+    const contentStream = this.getContentStream();
+    drawCircle({
+      cx: options.cx ?? this.x,
+      cy: options.cy ?? this.y,
+      r: options.r ?? 100,
+      rotate: options.rotate ?? undefined,
+      scale: options.scale ?? undefined,
+      translate: options.translate ?? undefined,
+      skew: options.skew ?? undefined,
+      matrix: options.matrix ?? undefined,
+      transform: options.transform ?? undefined,
+      clipPath: options.clipPath ?? undefined,
+      clipRule: options.clipRule ?? 'nonzero',
+      fill: options.fill ?? undefined,
+      fillRule: options.fillRule ?? 'nonzero',
+      stroke: options.stroke ?? undefined,
+      strokeWidth: options.strokeWidth ?? undefined,
+      strokeLineJoin: options.strokeLineJoin ?? undefined,
+      strokeMiterLimit: options.strokeMiterLimit ?? undefined,
+      strokeDashArray: options.strokeDashArray ?? undefined,
+      strokeDashOffset: options.strokeDashOffset ?? undefined,
+      strokeLineCap: options.strokeLineCap ?? undefined,
+      graphicsState: graphicsStateKey,
+    }).forEach((op) => contentStream.push(op));
+  }
+
+  private setOrEmbedFont(font?: PDFFont) {
+    const oldFont = this.font;
+    const oldFontKey = this.fontKey;
+
+    if (font) this.setFont(font);
+    else this.getFont();
+
+    const newFont = this.font!;
+    const newFontKey = this.fontKey!;
+
+    return { oldFont, oldFontKey, newFont, newFontKey };
   }
 
   /**
@@ -1214,84 +1827,170 @@ export default class PDFPage {
    */
   drawPath(options: PDFPageDrawPathOptions = {}): void {
     assertOrUndefined(options.d, 'options.d', ['string']);
-    assertOrUndefined(options.scale, 'options.scale', ['number']);
-    assertOrUndefined(options.rotate, 'options.rotate', [[Object, 'Rotation']]);
-    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
-    assertOrUndefined(options.fill, 'options.fill', [[Object, 'Color']]);
+    assertOrUndefined(options.rotate, 'options.rotate', [
+      [Object, 'Rotation'],
+      Array,
+    ]);
+    assertOrUndefined(options.scale, 'options.scale', ['number', Array]);
+    assertOrUndefined(options.translate, 'options.translate', [
+      'number',
+      Array,
+    ]);
+    assertOrUndefined(options.skew, 'options.skew', ['number', Array]);
+    assertOrUndefined(options.matrix, 'options.matrix', [Array]);
+    assertOrUndefined(options.transform, 'options.transform', ['string']);
+    assertOrUndefined(options.clipPath, 'options.clipPath', [Array]);
+    assertIsOneOfOrUndefined(options.clipRule, 'options.clipRule', [
+      'nonzero',
+      'evenodd',
+    ]);
+    assertOrUndefined(options.fill, 'options.fill', ['number']);
+    assertIsOneOfOrUndefined(options.fillRule, 'options.fillRule', [
+      'nonzero',
+      'evenodd',
+    ]);
     assertOrUndefined(options.stroke, 'options.stroke', [[Object, 'Color']]);
+    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
+    assertIsOneOfOrUndefined(
+      options.strokeLineJoin,
+      'options.strokeLineJoin',
+      LineJoinStyle,
+    );
+    assertOrUndefined(options.strokeMiterLimit, 'options.strokeWidth', [
+      'number',
+    ]);
     assertOrUndefined(options.strokeDashArray, 'options.strokeDashArray', [
       Array,
     ]);
-    assertOrUndefined(options.strokeDashPhase, 'options.strokeDashPhase', [
+    assertOrUndefined(options.strokeDashOffset, 'options.strokeDashPhase', [
       'number',
     ]);
     assertIsOneOfOrUndefined(
       options.strokeLineCap,
-      'options.borderLineCap',
+      'options.strokeLineCap',
       LineCapStyle,
     );
-    assertRangeOrUndefined(options.opacity, 'opacity.opacity', 0, 1);
     assertRangeOrUndefined(
-      options.borderOpacity,
-      'options.borderOpacity',
+      options.strokeOpacity,
+      'options.strokeOpacity',
       0,
       1,
     );
-    assertIsOneOfOrUndefined(options.blendMode, 'options.blendMode', BlendMode);
+    assertRangeOrUndefined(options.opacity, 'options.opacity', 0, 1);
+    assertIsOneOfOrUndefined(
+      options.mixBlendMode,
+      'options.mixBlendMode',
+      BlendMode,
+    );
 
     const graphicsStateKey = this.maybeEmbedGraphicsState({
+      fillOpacity: options.fillOpacity,
+      strokeOpacity: options.strokeOpacity,
       opacity: options.opacity,
-      borderOpacity: options.borderOpacity,
-      blendMode: options.blendMode,
+      mixBlendMode: options.mixBlendMode,
     });
 
-    if (!('color' in options) && !('borderColor' in options)) {
+    if (!('fill' in options) && !('stroke' in options)) {
       options.stroke = rgb(0, 0, 0);
     }
 
     const contentStream = this.getContentStream();
-    contentStream.push(
-      ...drawPath({
-        d: options.d ?? '',
-        scale: options.scale,
-        rotate: options.rotate ?? degrees(0),
-        fill: options.fill ?? undefined,
-        stroke: options.stroke ?? undefined,
-        strokeWidth: options.strokeWidth ?? 0,
-        strokeDashArray: options.strokeDashArray ?? undefined,
-        strokeDashPhase: options.strokeDashPhase ?? undefined,
-        strokeLineCap: options.strokeLineCap ?? undefined,
-        graphicsState: graphicsStateKey,
-      }),
-    );
+    drawPath({
+      d: options.d ?? '',
+      rotate: options.rotate ?? undefined,
+      scale: options.scale ?? undefined,
+      translate: options.translate ?? undefined,
+      skew: options.skew ?? undefined,
+      matrix: options.matrix ?? undefined,
+      transform: options.transform ?? undefined,
+      clipPath: options.clipPath ?? undefined,
+      clipRule: options.clipRule ?? 'nonzero',
+      fill: options.fill ?? undefined,
+      fillRule: options.fillRule ?? 'nonzero',
+      stroke: options.stroke ?? undefined,
+      strokeWidth: options.strokeWidth ?? undefined,
+      strokeLineJoin: options.strokeLineJoin ?? undefined,
+      strokeMiterLimit: options.strokeMiterLimit ?? undefined,
+      strokeDashArray: options.strokeDashArray ?? undefined,
+      strokeDashOffset: options.strokeDashOffset ?? undefined,
+      strokeLineCap: options.strokeLineCap ?? undefined,
+      graphicsState: graphicsStateKey,
+    }).forEach((op) => contentStream.push(op));
   }
 
   /**
-   * Draw a line on this page. For example:
+   * Draw an SVG path on this page. For example:
    * ```js
    * import { rgb } from 'pdf-lib'
    *
-   * page.drawLine({
-   *   start: { x: 25, y: 75 },
-   *   end: { x: 125, y: 175 },
-   *   thickness: 2,
-   *   color: rgb(0.75, 0.2, 0.2),
+   * const d = 'M 0,20 L 100,160 Q 130,200 150,120 C 190,-40 200,200 300,150 L 400,90'
+   *
+   * // Draw path as black line
+   * page.drawPath({ d: d, x: 25, y: 75 })
+   *
+   * // Change border style and opacity
+   * page.drawPath({
+   *   d: d,
+   *   x: 25,
+   *   y: 275,
+   *   borderColor: rgb(0.5, 0.5, 0.5),
+   *   borderWidth: 2,
+   *   borderOpacity: 0.75,
+   * })
+   *
+   * // Set fill color and opacity
+   * page.drawPath({
+   *   d: d,
+   *   x: 25,
+   *   y: 475,
+   *   color: rgb(1.0, 0, 0),
    *   opacity: 0.75,
    * })
+   *
+   * // Draw 50% of original size
+   * page.drawPath({
+   *   d: d,
+   *   x: 25,
+   *   y: 675,
+   *   scale: 0.5,
+   * })
    * ```
-   * @param options The options to be used when drawing the line.
+   * @param path The SVG path to be drawn.
+   * @param options The options to be used when drawing the SVG path.
    */
-  drawLine(options: PDFPageDrawLineOptions): void {
-    assertIs(options.x1, 'options.x1', ['number']);
-    assertIs(options.y1, 'options.x1', ['number']);
-    assertIs(options.x2, 'options.x1', ['number']);
-    assertIs(options.y2, 'options.x1', ['number']);
-    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
+  drawPolyline(options: PDFPageDrawPolylineOptions = {}): void {
+    assertOrUndefined(options.points, 'options.points', ['string', Array]);
+    assertOrUndefined(options.rotate, 'options.rotate', [
+      [Object, 'Rotation'],
+      Array,
+    ]);
+    assertOrUndefined(options.scale, 'options.scale', ['number', Array]);
+    assertOrUndefined(options.translate, 'options.translate', [
+      'number',
+      Array,
+    ]);
+    assertOrUndefined(options.skew, 'options.skew', ['number', Array]);
+    assertOrUndefined(options.matrix, 'options.matrix', [Array]);
+    assertOrUndefined(options.transform, 'options.transform', ['string']);
+    assertOrUndefined(options.clipPath, 'options.clipPath', [Array]);
+    assertIsOneOfOrUndefined(options.clipRule, 'options.clipRule', [
+      'nonzero',
+      'evenodd',
+    ]);
     assertOrUndefined(options.stroke, 'options.stroke', [[Object, 'Color']]);
+    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
+    assertIsOneOfOrUndefined(
+      options.strokeLineJoin,
+      'options.strokeLineJoin',
+      LineJoinStyle,
+    );
+    assertOrUndefined(options.strokeMiterLimit, 'options.strokeWidth', [
+      'number',
+    ]);
     assertOrUndefined(options.strokeDashArray, 'options.strokeDashArray', [
       Array,
     ]);
-    assertOrUndefined(options.strokeDashPhase, 'options.strokeDashPhase', [
+    assertOrUndefined(options.strokeDashOffset, 'options.strokeDashPhase', [
       'number',
     ]);
     assertIsOneOfOrUndefined(
@@ -1299,157 +1998,130 @@ export default class PDFPage {
       'options.strokeLineCap',
       LineCapStyle,
     );
-    assertRangeOrUndefined(options.opacity, 'opacity.opacity', 0, 1);
-    assertIsOneOfOrUndefined(options.blendMode, 'options.blendMode', BlendMode);
+    assertRangeOrUndefined(
+      options.strokeOpacity,
+      'options.strokeOpacity',
+      0,
+      1,
+    );
+    assertRangeOrUndefined(options.opacity, 'options.opacity', 0, 1);
+    assertIsOneOfOrUndefined(
+      options.mixBlendMode,
+      'options.mixBlendMode',
+      BlendMode,
+    );
 
     const graphicsStateKey = this.maybeEmbedGraphicsState({
-      borderOpacity: options.opacity,
-      blendMode: options.blendMode,
+      fillOpacity: options.fillOpacity,
+      strokeOpacity: options.strokeOpacity,
+      opacity: options.opacity,
+      mixBlendMode: options.mixBlendMode,
     });
 
-    if (!('stroke' in options)) {
+    if (!('fill' in options) && !('stroke' in options)) {
       options.stroke = rgb(0, 0, 0);
     }
 
     const contentStream = this.getContentStream();
-    contentStream.push(
-      ...drawLine({
-        x1: options.x1 ?? 0,
-        y1: options.y1 ?? 0,
-        x2: options.x2 ?? 1,
-        y2: options.y2 ?? 1,
-        stroke: options.stroke ?? undefined,
-        strokeWidth: options.strokeWidth ?? 1,
-        strokeDashArray: options.strokeDashArray ?? undefined,
-        strokeDashPhase: options.strokeDashPhase ?? undefined,
-        strokeLineCap: options.strokeLineCap ?? undefined,
-        graphicsState: graphicsStateKey,
-      }),
-    );
+    drawPolyline({
+      points: options.points ?? '',
+      rotate: options.rotate ?? undefined,
+      scale: options.scale ?? undefined,
+      translate: options.translate ?? undefined,
+      skew: options.skew ?? undefined,
+      matrix: options.matrix ?? undefined,
+      transform: options.transform ?? undefined,
+      clipPath: options.clipPath ?? undefined,
+      clipRule: options.clipRule ?? 'nonzero',
+      stroke: options.stroke ?? undefined,
+      strokeWidth: options.strokeWidth ?? undefined,
+      strokeLineJoin: options.strokeLineJoin ?? undefined,
+      strokeMiterLimit: options.strokeMiterLimit ?? undefined,
+      strokeDashArray: options.strokeDashArray ?? undefined,
+      strokeDashOffset: options.strokeDashOffset ?? undefined,
+      strokeLineCap: options.strokeLineCap ?? undefined,
+      graphicsState: graphicsStateKey,
+    }).forEach((op) => contentStream.push(op));
   }
 
   /**
-   * Draw a rectangle on this page. For example:
+   * Draw an SVG path on this page. For example:
    * ```js
-   * import { degrees, grayscale, rgb } from 'pdf-lib'
+   * import { rgb } from 'pdf-lib'
    *
-   * page.drawRectangle({
+   * const d = 'M 0,20 L 100,160 Q 130,200 150,120 C 190,-40 200,200 300,150 L 400,90'
+   *
+   * // Draw path as black line
+   * page.drawPath({ d: d, x: 25, y: 75 })
+   *
+   * // Change border style and opacity
+   * page.drawPath({
+   *   d: d,
    *   x: 25,
-   *   y: 75,
-   *   width: 250,
-   *   height: 75,
-   *   rotate: degrees(-15),
-   *   borderWidth: 5,
-   *   borderColor: grayscale(0.5),
-   *   color: rgb(0.75, 0.2, 0.2),
-   *   opacity: 0.5,
+   *   y: 275,
+   *   borderColor: rgb(0.5, 0.5, 0.5),
+   *   borderWidth: 2,
    *   borderOpacity: 0.75,
    * })
+   *
+   * // Set fill color and opacity
+   * page.drawPath({
+   *   d: d,
+   *   x: 25,
+   *   y: 475,
+   *   color: rgb(1.0, 0, 0),
+   *   opacity: 0.75,
+   * })
+   *
+   * // Draw 50% of original size
+   * page.drawPath({
+   *   d: d,
+   *   x: 25,
+   *   y: 675,
+   *   scale: 0.5,
+   * })
    * ```
-   * @param options The options to be used when drawing the rectangle.
+   * @param path The SVG path to be drawn.
+   * @param options The options to be used when drawing the SVG path.
    */
-  drawRect(options: PDFPageDrawRectOptions = {}): void {
-    assertOrUndefined(options.x, 'options.x', ['number']);
-    assertOrUndefined(options.y, 'options.y', ['number']);
-    assertOrUndefined(options.width, 'options.width', ['number']);
-    assertOrUndefined(options.height, 'options.height', ['number']);
-    assertOrUndefined(options.rx, 'options.rx', ['number']);
-    assertOrUndefined(options.ry, 'options.ry', ['number']);
-    assertOrUndefined(options.rotate, 'options.rotate', [[Object, 'Rotation']]);
-    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
-    assertOrUndefined(options.fill, 'options.color', [[Object, 'Color']]);
-    assertRangeOrUndefined(options.opacity, 'opacity.opacity', 0, 1);
-    assertOrUndefined(options.stroke, 'options.stroke', [[Object, 'Color']]);
-    assertOrUndefined(options.strokeDashArray, 'options.strokeDashArray', [
+  drawPolygon(options: PDFPageDrawPolygonOptions = {}): void {
+    assertOrUndefined(options.points, 'options.points', ['string', Array]);
+    assertOrUndefined(options.rotate, 'options.rotate', [
+      [Object, 'Rotation'],
       Array,
     ]);
-    assertOrUndefined(options.strokeDashPhase, 'options.strokeDashPhase', [
+    assertOrUndefined(options.scale, 'options.scale', ['number', Array]);
+    assertOrUndefined(options.translate, 'options.translate', [
+      'number',
+      Array,
+    ]);
+    assertOrUndefined(options.skew, 'options.skew', ['number', Array]);
+    assertOrUndefined(options.matrix, 'options.matrix', [Array]);
+    assertOrUndefined(options.transform, 'options.transform', ['string']);
+    assertOrUndefined(options.clipPath, 'options.clipPath', [Array]);
+    assertIsOneOfOrUndefined(options.clipRule, 'options.clipRule', [
+      'nonzero',
+      'evenodd',
+    ]);
+    assertOrUndefined(options.fill, 'options.fill', ['number']);
+    assertIsOneOfOrUndefined(options.fillRule, 'options.fillRule', [
+      'nonzero',
+      'evenodd',
+    ]);
+    assertOrUndefined(options.stroke, 'options.stroke', [[Object, 'Color']]);
+    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
+    assertIsOneOfOrUndefined(
+      options.strokeLineJoin,
+      'options.strokeLineJoin',
+      LineJoinStyle,
+    );
+    assertOrUndefined(options.strokeMiterLimit, 'options.strokeWidth', [
       'number',
     ]);
-    assertIsOneOfOrUndefined(
-      options.strokeLineCap,
-      'options.borderLineCap',
-      LineCapStyle,
-    );
-    assertRangeOrUndefined(
-      options.borderOpacity,
-      'options.borderOpacity',
-      0,
-      1,
-    );
-    assertIsOneOfOrUndefined(options.blendMode, 'options.blendMode', BlendMode);
-
-    const graphicsStateKey = this.maybeEmbedGraphicsState({
-      opacity: options.opacity,
-      borderOpacity: options.borderOpacity,
-      blendMode: options.blendMode,
-    });
-
-    if (!('fill' in options) && !('stroke' in options)) {
-      options.fill = rgb(0, 0, 0);
-    }
-
-    const contentStream = this.getContentStream();
-    contentStream.push(
-      ...drawRect({
-        x: options.x ?? this.x,
-        y: options.y ?? this.y,
-        width: options.width ?? 150,
-        height: options.height ?? 100,
-        rx: options.rx ?? undefined,
-        ry: options.ry ?? undefined,
-        fill: options.fill ?? undefined,
-        fillRule: options.fillRule ?? 'nonzero',
-        stroke: options.stroke ?? undefined,
-        strokeWidth: options.strokeWidth ?? 0,
-        strokeDashArray: options.strokeDashArray ?? undefined,
-        strokeDashPhase: options.strokeDashPhase ?? undefined,
-        graphicsState: graphicsStateKey,
-        strokeLineCap: options.strokeLineCap ?? undefined,
-      }),
-    );
-  }
-
-  /**
-   * Draw an ellipse on this page. For example:
-   * ```js
-   * import { grayscale, rgb } from 'pdf-lib'
-   *
-   * page.drawEllipse({
-   *   x: 200,
-   *   y: 75,
-   *   xScale: 100,
-   *   yScale: 50,
-   *   borderWidth: 5,
-   *   borderColor: grayscale(0.5),
-   *   color: rgb(0.75, 0.2, 0.2),
-   *   opacity: 0.5,
-   *   borderOpacity: 0.75,
-   * })
-   * ```
-   * @param options The options to be used when drawing the ellipse.
-   */
-  drawEllipse(options: PDFPageDrawEllipseOptions = {}): void {
-    assertOrUndefined(options.cx, 'options.x', ['number']);
-    assertOrUndefined(options.cy, 'options.y', ['number']);
-    assertOrUndefined(options.rx, 'options.xScale', ['number']);
-    assertOrUndefined(options.ry, 'options.yScale', ['number']);
-    assertOrUndefined(options.rotate, 'options.rotate', [[Object, 'Rotation']]);
-    assertOrUndefined(options.fill, 'options.fill', ['number']);
-    assertOrUndefined(options.fillRule, 'options.fillRule', ['number']);
-    assertRangeOrUndefined(options.opacity, 'opacity.opacity', 0, 1);
-    assertOrUndefined(options.stroke, 'options.stroke', [[Object, 'Color']]);
-    assertRangeOrUndefined(
-      options.borderOpacity,
-      'options.borderOpacity',
-      0,
-      1,
-    );
-    assertOrUndefined(options.strokeWidth, 'options.strokeWidth', ['number']);
     assertOrUndefined(options.strokeDashArray, 'options.strokeDashArray', [
       Array,
     ]);
-    assertOrUndefined(options.strokeDashPhase, 'options.strokeDashPhase', [
+    assertOrUndefined(options.strokeDashOffset, 'options.strokeDashPhase', [
       'number',
     ]);
     assertIsOneOfOrUndefined(
@@ -1457,72 +2129,52 @@ export default class PDFPage {
       'options.strokeLineCap',
       LineCapStyle,
     );
-    assertIsOneOfOrUndefined(options.blendMode, 'options.blendMode', BlendMode);
+    assertRangeOrUndefined(
+      options.strokeOpacity,
+      'options.strokeOpacity',
+      0,
+      1,
+    );
+    assertRangeOrUndefined(options.opacity, 'options.opacity', 0, 1);
+    assertIsOneOfOrUndefined(
+      options.mixBlendMode,
+      'options.mixBlendMode',
+      BlendMode,
+    );
+
     const graphicsStateKey = this.maybeEmbedGraphicsState({
+      fillOpacity: options.fillOpacity,
+      strokeOpacity: options.strokeOpacity,
       opacity: options.opacity,
-      borderOpacity: options.borderOpacity,
-      blendMode: options.blendMode,
+      mixBlendMode: options.mixBlendMode,
     });
 
     if (!('fill' in options) && !('stroke' in options)) {
-      options.fill = rgb(0, 0, 0);
+      options.stroke = rgb(0, 0, 0);
     }
 
     const contentStream = this.getContentStream();
-    contentStream.push(
-      ...drawEllipse({
-        cx: options.cx ?? this.x,
-        cy: options.cy ?? this.y,
-        rx: options.rx ?? 100,
-        ry: options.ry ?? 100,
-        rotate: options.rotate ?? undefined,
-        fill: options.fill ?? undefined,
-        fillRule: options.fillRule ?? 'nonzero',
-        stroke: options.stroke ?? undefined,
-        strokeWidth: options.strokeWidth ?? 0,
-        strokeDashArray: options.strokeDashArray ?? undefined,
-        strokeDashPhase: options.strokeDashPhase ?? undefined,
-        strokeLineCap: options.strokeLineCap ?? undefined,
-        graphicsState: graphicsStateKey,
-      }),
-    );
-  }
-
-  /**
-   * Draw a circle on this page. For example:
-   * ```js
-   * import { grayscale, rgb } from 'pdf-lib'
-   *
-   * page.drawCircle({
-   *   x: 200,
-   *   y: 150,
-   *   size: 100,
-   *   borderWidth: 5,
-   *   borderColor: grayscale(0.5),
-   *   color: rgb(0.75, 0.2, 0.2),
-   *   opacity: 0.5,
-   *   borderOpacity: 0.75,
-   * })
-   * ```
-   * @param options The options to be used when drawing the ellipse.
-   */
-  drawCircle(options: PDFPageDrawCircleOptions = {}): void {
-    const { r = 100 } = options;
-    assertOrUndefined(r, 'size', ['number']);
-    this.drawEllipse({ ...options, rx: r, ry: r });
-  }
-
-  private setOrEmbedFont(font?: PDFFont) {
-    const oldFont = this.font;
-    const oldFontKey = this.fontKey;
-
-    if (font) this.setFont(font);
-    else this.getFont();
-
-    const newFont = this.font!;
-    const newFontKey = this.fontKey!;
-
-    return { oldFont, oldFontKey, newFont, newFontKey };
+    drawPolygon({
+      points: options.points ?? '',
+      rotate: options.rotate ?? undefined,
+      scale: options.scale ?? undefined,
+      translate: options.translate ?? undefined,
+      skew: options.skew ?? undefined,
+      matrix: options.matrix ?? undefined,
+      transform: options.transform ?? undefined,
+      clipPath: options.clipPath ?? undefined,
+      clipRule: options.clipRule ?? 'nonzero',
+      fill: options.fill ?? undefined,
+      fillRule: options.fillRule ?? 'nonzero',
+      stroke: options.stroke ?? undefined,
+      strokeWidth: options.strokeWidth ?? undefined,
+      strokeLineJoin: options.strokeLineJoin ?? undefined,
+      strokeMiterLimit: options.strokeMiterLimit ?? undefined,
+      strokeDashArray: options.strokeDashArray ?? undefined,
+      strokeDashOffset: options.strokeDashOffset ?? undefined,
+      strokeLineCap: options.strokeLineCap ?? undefined,
+      graphicsState: graphicsStateKey,
+    }).forEach((op) => contentStream.push(op));
   }
 
   /**
@@ -1541,41 +2193,18 @@ export default class PDFPage {
     options: PDFPageDrawOptions = {},
   ): void {
     assertIs(graphic, 'graphic', [[Object, 'PDFGraphic']]);
-    assertOrUndefined(options.x, 'options.x', ['number']);
-    assertOrUndefined(options.y, 'options.y', ['number']);
-    assertOrUndefined(options.rotate, 'options.rotate', [[Object, 'Rotation']]);
+    // assertOrUndefined(options.x, 'options.x', ['number']);
+    // assertOrUndefined(options.y, 'options.y', ['number']);
+    assertOrUndefined(options.rotate, 'options.rotate', [
+      [Object, 'Rotation'],
+      Array,
+    ]);
     assertOrUndefined(options.scale, 'options.scale', ['number']);
 
     const contentStream = this.getContentStream();
 
-    const operators = draw(graphic, this, {
-      x: options.x || 0,
-      y: options.y || 0,
-      rotate: options.rotate || degrees(0),
-      scale: options.scale || 1,
-      clipPath: options.clipPath,
-      clipRule: options.clipRule,
-    });
-
+    const operators = draw(graphic, this, options);
     operators.forEach((o) => contentStream.push(o));
-  }
-
-  /**
-   * Draw an SVG on this page. For example:
-   * ```js
-   * const svg = '<svg><path d="M 0,20 L 100,160 Q 130,200 150,120 C 190,-40 200,200 300,150 L 400,90"></path></svg>'
-   *
-   * // Draw svg
-   * page.drawSvg(svg, { x: 25, y: 75 })
-   * ```
-   * @param svg The SVG to be drawn.
-   * @param options The options to be used when drawing the SVG.
-   */
-  apply(operators: PDFOperator[]): void {
-    // assertIs(operators, 'graphic', [[Object, 'PDFGraphic']]);
-
-    const contentStream = this.getContentStream();
-    contentStream.push(...operators);
   }
 
   getFont(): [PDFFont, PDFName] {
@@ -1606,25 +2235,25 @@ export default class PDFPage {
   }
 
   private maybeEmbedGraphicsState(options: {
+    fillOpacity?: number;
+    strokeOpacity?: number;
     opacity?: number;
-    borderOpacity?: number;
-    blendMode?: BlendMode;
+    mixBlendMode?: BlendMode;
   }): PDFName | undefined {
-    const { opacity, borderOpacity, blendMode } = options;
-
     if (
-      opacity === undefined &&
-      borderOpacity === undefined &&
-      blendMode === undefined
+      options.fillOpacity === undefined &&
+      options.strokeOpacity === undefined &&
+      options.opacity === undefined &&
+      options.mixBlendMode === undefined
     ) {
       return undefined;
     }
 
     const graphicsState = this.doc.context.obj({
       Type: 'ExtGState',
-      ca: opacity,
-      CA: borderOpacity,
-      BM: blendMode,
+      ca: opacity(options.fillOpacity, options.opacity),
+      CA: opacity(options.strokeOpacity, options.opacity),
+      BM: options.mixBlendMode,
     });
 
     const key = this.node.newExtGState('GS', graphicsState);

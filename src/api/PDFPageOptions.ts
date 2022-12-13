@@ -1,7 +1,7 @@
 import { Color } from 'src/api/colors';
 import PDFFont from 'src/api/PDFFont';
 import { Rotation } from 'src/api/rotations';
-import { LineCapStyle } from 'src/api/operators';
+import { LineCapStyle, LineJoinStyle } from 'src/api/operators';
 import { PDFOperator } from '..';
 
 export enum BlendMode {
@@ -61,36 +61,29 @@ export interface PDFPageDrawPageOptions {
   blendMode?: BlendMode;
 }
 
-export interface PDFPageDrawPathOptions {
-  d?: string;
-  rotate?: Rotation;
-  scale?: number;
-  fill?: Color;
-  fillRule?: 'nonzero' | 'evenodd';
-  stroke?: Color;
-  strokeWidth?: number;
-  strokeDashArray?: number[];
-  strokeDashPhase?: number;
-  strokeLineCap?: LineCapStyle;
-  borderOpacity?: number;
-  opacity?: number;
-  blendMode?: BlendMode;
-}
-
 export interface PDFPageDrawLineOptions {
   x1?: number;
   y1?: number;
   x2?: number;
   y2?: number;
-  rotate?: Rotation;
-  scale?: number;
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
   stroke?: Color;
   strokeWidth?: number;
-  strokeLineCap?: LineCapStyle;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
   strokeDashArray?: number[];
-  strokeDashPhase?: number;
+  strokeDashOffset?: number;
+  strokeLineCap?: LineCapStyle;
+  strokeOpacity?: number;
   opacity?: number;
-  blendMode?: BlendMode;
+  mixBlendMode?: BlendMode;
 }
 
 export interface PDFPageDrawRectOptions {
@@ -100,18 +93,60 @@ export interface PDFPageDrawRectOptions {
   height?: number;
   rx?: number;
   ry?: number;
-  rotate?: Rotation;
-  scale?: number;
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
   fill?: Color;
   fillRule?: 'nonzero' | 'evenodd';
   stroke?: Color;
   strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
   strokeDashArray?: number[];
-  strokeDashPhase?: number;
+  strokeDashOffset?: number;
   strokeLineCap?: LineCapStyle;
-  borderOpacity?: number;
+  strokeOpacity?: number;
+  fillOpacity?: number;
   opacity?: number;
-  blendMode?: BlendMode;
+  mixBlendMode?: BlendMode;
+}
+
+export interface PDFPageDrawArcOptions {
+  x?: number; // start at x
+  y?: number; // start at y
+  rx?: number;
+  ry?: number;
+  rot?: number;
+  large?: number;
+  sweep?: number;
+  ex?: number; // end at ex
+  ey?: number; // end at ey
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
+  fill?: Color;
+  fillRule?: 'nonzero' | 'evenodd';
+  stroke?: Color;
+  strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
+  strokeDashArray?: number[];
+  strokeDashOffset?: number;
+  strokeLineCap?: LineCapStyle;
+  strokeOpacity?: number;
+  fillOpacity?: number;
+  opacity?: number;
+  mixBlendMode?: BlendMode;
 }
 
 export interface PDFPageDrawEllipseOptions {
@@ -119,47 +154,136 @@ export interface PDFPageDrawEllipseOptions {
   cy?: number;
   rx?: number;
   ry?: number;
-  rotate?: Rotation;
-  scale?: number;
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
   fill?: Color;
   fillRule?: 'nonzero' | 'evenodd';
   stroke?: Color;
   strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
   strokeDashArray?: number[];
-  strokeDashPhase?: number;
+  strokeDashOffset?: number;
   strokeLineCap?: LineCapStyle;
-  borderOpacity?: number;
+  strokeOpacity?: number;
+  fillOpacity?: number;
   opacity?: number;
-  blendMode?: BlendMode;
+  mixBlendMode?: BlendMode;
 }
 
 export interface PDFPageDrawCircleOptions {
   cx?: number;
   cy?: number;
   r?: number;
-  rotate?: Rotation;
-  scale?: number;
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
   fill?: Color;
   fillRule?: 'nonzero' | 'evenodd';
   stroke?: Color;
   strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
   strokeDashArray?: number[];
-  strokeDashPhase?: number;
+  strokeDashOffset?: number;
   strokeLineCap?: LineCapStyle;
-  borderOpacity?: number;
+  strokeOpacity?: number;
+  fillOpacity?: number;
   opacity?: number;
-  blendMode?: BlendMode;
+  mixBlendMode?: BlendMode;
+}
+
+export interface PDFPageDrawPolylineOptions {
+  points?: string | [number, number][];
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
+  stroke?: Color;
+  strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
+  strokeDashArray?: number[];
+  strokeDashOffset?: number;
+  strokeLineCap?: LineCapStyle;
+  strokeOpacity?: number;
+  fillOpacity?: number;
+  opacity?: number;
+  mixBlendMode?: BlendMode;
+}
+
+export interface PDFPageDrawPolygonOptions {
+  points?: string | [number, number][];
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
+  fill?: Color;
+  fillRule?: 'nonzero' | 'evenodd';
+  stroke?: Color;
+  strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
+  strokeDashArray?: number[];
+  strokeDashOffset?: number;
+  strokeLineCap?: LineCapStyle;
+  strokeOpacity?: number;
+  fillOpacity?: number;
+  opacity?: number;
+  mixBlendMode?: BlendMode;
+}
+
+export interface PDFPageDrawPathOptions {
+  d?: string;
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
+  clipPath?: PDFOperator[];
+  clipRule?: 'nonzero' | 'evenodd';
+  fill?: Color;
+  fillRule?: 'nonzero' | 'evenodd';
+  stroke?: Color;
+  strokeWidth?: number;
+  strokeLineJoin?: LineJoinStyle;
+  strokeMiterLimit?: number;
+  strokeDashArray?: number[];
+  strokeDashOffset?: number;
+  strokeLineCap?: LineCapStyle;
+  strokeOpacity?: number;
+  fillOpacity?: number;
+  opacity?: number;
+  mixBlendMode?: BlendMode;
 }
 
 export interface PDFPageDrawOptions {
-  x?: number;
-  y?: number;
-  rotate?: Rotation;
-  scale?: number;
+  rotate?: Rotation | [Rotation, [number, number]];
+  scale?: number | [number, number];
+  translate?: number | [number, number];
+  skew?: number | [number, number];
+  matrix?: [number, number, number, number, number, number];
+  transform?: string;
   clipPath?: PDFOperator[];
   clipRule?: 'nonzero' | 'evenodd';
 }
-
-export interface PDFPageApplyOptions {}
-
-export interface PDFPageDrawGraphicOptions {}

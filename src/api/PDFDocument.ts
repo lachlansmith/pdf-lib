@@ -71,7 +71,8 @@ import FileEmbedder, { AFRelationship } from 'src/core/embedders/FileEmbedder';
 import PDFEmbeddedFile from 'src/api/PDFEmbeddedFile';
 import PDFJavaScript from 'src/api/PDFJavaScript';
 import JavaScriptEmbedder from 'src/core/embedders/JavaScriptEmbedder';
-import parseJsx, { JSXParserState } from 'src/api/JSXParser';
+import parseJsx from 'src/api/JSXParser';
+import JSXParserState from 'src/api/JSXParserState';
 
 /**
  * Represents a PDF document.
@@ -191,28 +192,28 @@ export default class PDFDocument {
       fonts = {},
       attributes = {},
       throwOnInvalidElement = true,
+      throwOnInvalidAttribute = true,
+      outlineText = false,
     } = options;
 
     if (elements instanceof Array) {
       await Promise.all(
         elements.map(async (el, index) => {
           const graphic = await doc.embedJsx(el, {
-            state: new JSXParserState(
-              css,
-              defs,
-              fonts,
-              {
-                fontFamily: 'Courier',
-                fontWeight: '400',
-                fontStyle: 'normal',
-                fontSize: 12,
-                font: await doc.embedFont(StandardFonts.Courier),
-                ...attributes,
-              },
-              {
-                throwOnInvalidElement,
-              },
-            ),
+            css,
+            defs,
+            fonts,
+            attributes: {
+              fontFamily: 'Courier',
+              fontWeight: '400',
+              fontStyle: 'normal',
+              fontSize: 12,
+              font: await doc.embedFont(StandardFonts.Courier),
+              ...attributes,
+            },
+            throwOnInvalidElement,
+            throwOnInvalidAttribute,
+            outlineText,
           });
 
           if (!graphic) {
@@ -227,29 +228,27 @@ export default class PDFDocument {
             el.type === 'svg' ? viewBox(el.props.viewBox) : undefined,
           );
 
-          page.draw(graphic, { x: 0, y: page.getHeight() });
+          page.draw(graphic, { translate: [0, page.getHeight()] });
         }),
       );
     } else {
       const tagName = elements.type.toString();
 
       const graphic = await doc.embedJsx(elements, {
-        state: new JSXParserState(
-          css,
-          defs,
-          fonts,
-          {
-            fontFamily: 'Courier',
-            fontWeight: '400',
-            fontStyle: 'normal',
-            fontSize: 12,
-            font: await doc.embedFont(StandardFonts.Courier),
-            ...attributes,
-          },
-          {
-            throwOnInvalidElement,
-          },
-        ),
+        css,
+        defs,
+        fonts,
+        attributes: {
+          fontFamily: 'Courier',
+          fontWeight: '400',
+          fontStyle: 'normal',
+          fontSize: 12,
+          font: await doc.embedFont(StandardFonts.Courier),
+          ...attributes,
+        },
+        throwOnInvalidElement,
+        throwOnInvalidAttribute,
+        outlineText,
       });
 
       if (!graphic) {
@@ -264,7 +263,7 @@ export default class PDFDocument {
         tagName === 'svg' ? viewBox(elements.props.viewBox) : undefined,
       );
 
-      page.draw(graphic, { x: 0, y: page.getHeight() });
+      page.draw(graphic, { translate: [0, page.getHeight()] });
     }
 
     return doc;
@@ -1347,22 +1346,26 @@ export default class PDFDocument {
    */
   async embedJsx(element: JSX.Element, options: EmbedJsxOptions = {}) {
     const {
-      state = new JSXParserState(
-        {},
-        {},
-        {},
-        {
-          fontFamily: 'Courier',
-          fontWeight: '400',
-          fontStyle: 'normal',
-          fontSize: 12,
-          font: await this.embedFont(StandardFonts.Courier),
-        },
-        {
-          throwOnInvalidElement: true,
-        },
-      ),
+      css = {},
+      defs = {},
+      fonts = {},
+      attributes = {
+        fontFamily: 'Courier',
+        fontWeight: '400',
+        fontStyle: 'normal',
+        fontSize: 12,
+        font: await this.embedFont(StandardFonts.Courier),
+      },
+      throwOnInvalidElement = true,
+      throwOnInvalidAttribute = true,
+      outlineText = false,
     } = options;
+
+    const state = new JSXParserState(css, defs, fonts, attributes, {
+      throwOnInvalidElement,
+      throwOnInvalidAttribute,
+      outlineText,
+    });
 
     return await parseJsx(element, this, state);
   }
@@ -1493,7 +1496,7 @@ export default class PDFDocument {
     return newInfo;
   }
 
-  private assertFontkit(): Fontkit {
+  public assertFontkit(): Fontkit {
     if (!this.fontkit) throw new FontkitNotRegisteredError();
     return this.fontkit;
   }
